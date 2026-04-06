@@ -1,0 +1,1673 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>WGI · Simulateur BESS</title>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+:root{
+  --gd:#0d1f3c;--gp:#1a3a6b;--gm:#2563eb;--gl:#3b82f6;--gpa:#eff6ff;
+  --gold:#f59e0b;--goldp:#fef3c7;
+  --green:#16a34a;--greenp:#dcfce7;
+  --orange:#ea580c;--orangep:#fff7ed;
+  --w:#fff;--g50:#f8fafc;--g100:#f1f5f9;--g200:#e2e8f0;
+  --g300:#cbd5e1;--g400:#94a3b8;--g500:#64748b;--g700:#334155;--g900:#0f172a;
+  --red:#dc2626;--teal:#0d9488;--tealp:#f0fdfa;
+  --rad:12px;--rads:8px;--sh:0 4px 24px rgba(0,0,0,.07);
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Outfit',sans-serif;background:var(--g50);color:var(--g900);min-height:100vh}
+
+/* HEADER */
+header{background:linear-gradient(135deg,var(--gd),var(--gp) 50%,#1e40af);color:#fff;position:relative;overflow:hidden}
+header::before{content:'';position:absolute;inset:0;background:url("data:image/svg+xml,%3Csvg width='80' height='80' viewBox='0 0 80 80' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='%23fff' fill-opacity='0.03'%3E%3Cpath d='M0 0h40v40H0zm40 40h40v40H40z'/%3E%3C/g%3E%3C/svg%3E")}
+.hi{position:relative;max-width:1300px;margin:0 auto;padding:18px 28px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px}
+.lb{display:flex;align-items:center;gap:12px}
+.li{width:40px;height:40px;background:var(--gold);border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:20px;box-shadow:0 4px 12px rgba(245,158,11,.4)}
+.lt h1{font-size:1.1rem;font-weight:700;letter-spacing:-.02em}
+.lt p{font-size:.68rem;color:rgba(255,255,255,.55);margin-top:1px}
+.hbadge{background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.2);border-radius:999px;padding:4px 12px;font-size:.67rem;font-weight:500;text-transform:uppercase;letter-spacing:.05em;color:rgba(255,255,255,.75)}
+
+/* NAV TABS */
+.nav{background:var(--w);border-bottom:2px solid var(--g200);position:sticky;top:0;z-index:100;box-shadow:0 2px 8px rgba(0,0,0,.05)}
+.nav-inner{max-width:1300px;margin:0 auto;padding:0 28px;display:flex;gap:2px;overflow-x:auto}
+.ntab{padding:12px 16px;font-size:.78rem;font-weight:600;color:var(--g500);cursor:pointer;border-bottom:3px solid transparent;margin-bottom:-2px;transition:all .15s;white-space:nowrap;display:flex;align-items:center;gap:6px}
+.ntab:hover:not(.active){color:var(--g700)}
+.ntab.active{color:var(--gm);border-bottom-color:var(--gm)}
+.ntab .badge{background:var(--gpa);color:var(--gm);border-radius:999px;padding:1px 7px;font-size:.62rem;font-weight:700}
+.ntab.active .badge{background:var(--gm);color:#fff}
+
+/* MAIN */
+main{max-width:1300px;margin:0 auto;padding:22px 28px}
+.tab-section{display:none}.tab-section.active{display:block}
+
+/* CARDS */
+.card{background:var(--w);border-radius:var(--rad);box-shadow:var(--sh);overflow:hidden;margin-bottom:16px}
+.card:last-child{margin-bottom:0}
+.ch{padding:12px 18px 10px;border-bottom:1px solid var(--g100);display:flex;align-items:center;gap:9px}
+.ch .ico{width:28px;height:28px;background:var(--gpa);border-radius:7px;display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0}
+.ch h2{font-size:.88rem;font-weight:600}
+.ch .sub{font-size:.72rem;color:var(--g400);margin-left:auto}
+.cb{padding:16px 18px}
+
+/* GRID LAYOUTS */
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.g3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px}
+.g4{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+@media(max-width:700px){.g2,.g3,.g4{grid-template-columns:1fr}}
+
+/* FIELDS */
+.f{margin-bottom:10px}.f:last-child{margin-bottom:0}
+.f label{display:block;font-size:.67rem;font-weight:700;color:var(--g500);margin-bottom:3px;text-transform:uppercase;letter-spacing:.04em}
+.f label .h{font-weight:400;color:var(--g300);text-transform:none;font-size:.65rem}
+.ir{display:flex;align-items:center;border:1.5px solid var(--g200);border-radius:var(--rads);overflow:hidden;background:#fff;transition:border-color .15s}
+.ir:focus-within{border-color:var(--gm);box-shadow:0 0 0 3px rgba(37,99,235,.08)}
+.ir input[type="number"]{flex:1;border:none;outline:none;padding:7px 10px;font-family:'Outfit',sans-serif;font-size:.85rem;font-weight:500;color:var(--g900);background:transparent;-moz-appearance:textfield}
+.ir input::-webkit-outer-spin-button,.ir input::-webkit-inner-spin-button{-webkit-appearance:none}
+.iu{padding:0 9px;font-size:.7rem;font-weight:500;color:var(--g500);background:var(--g50);border-left:1.5px solid var(--g200);display:flex;align-items:center;white-space:nowrap;height:100%}
+select{width:100%;border:1.5px solid var(--g200);border-radius:var(--rads);padding:7px 10px;font-family:'Outfit',sans-serif;font-size:.85rem;font-weight:500;color:var(--g900);background:#fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='13' height='13' viewBox='0 0 24 24' fill='none' stroke='%2364748b' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E") no-repeat right 9px center;outline:none;cursor:pointer;appearance:none;transition:border-color .15s}
+select:focus{border-color:var(--gm)}
+.sec{font-size:.63rem;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--gm);padding:9px 0 4px;border-top:1px solid var(--g100);margin-top:8px}
+.sec:first-child{border-top:none;margin-top:0;padding-top:0}
+.ib{background:var(--gpa);border-left:3px solid var(--gl);border-radius:0 6px 6px 0;padding:6px 10px;font-size:.7rem;color:var(--gp);line-height:1.4}
+.ib.warn{background:var(--orangep);border-color:var(--orange);color:var(--orange)}
+.ib.ok{background:var(--greenp);border-color:var(--green);color:var(--green)}
+
+/* DATA INPUT */
+.paste-area{width:100%;min-height:180px;border:2px dashed var(--g300);border-radius:var(--rads);padding:12px;font-family:'DM Mono',monospace;font-size:.7rem;color:var(--g700);background:var(--g50);resize:vertical;outline:none;transition:border-color .15s;line-height:1.5}
+.paste-area:focus{border-color:var(--gm);background:#fff}
+.paste-area::placeholder{color:var(--g400)}
+
+/* COLUMN MAPPING */
+.colmap{display:none}
+.colmap.visible{display:block}
+.colmap-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:8px;margin-top:8px}
+.colmap-item{background:var(--g50);border:1px solid var(--g200);border-radius:7px;padding:8px 10px}
+.colmap-name{font-size:.65rem;font-weight:700;color:var(--g400);margin-bottom:4px;text-overflow:ellipsis;overflow:hidden;white-space:nowrap}
+.data-preview{overflow-x:auto;margin-top:10px}
+.data-preview table{width:100%;border-collapse:collapse;font-size:.68rem;font-family:'DM Mono',monospace}
+.data-preview th{background:var(--gp);color:#fff;padding:4px 7px;text-align:left;white-space:nowrap;font-size:.64rem}
+.data-preview td{padding:3px 7px;border-bottom:1px solid var(--g100);white-space:nowrap}
+.data-preview tr:nth-child(even) td{background:var(--g50)}
+
+/* STAT CHIPS */
+.stat-chips{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
+.chip{background:var(--gpa);border-radius:8px;padding:6px 12px;display:flex;flex-direction:column;gap:2px}
+.chip-l{font-size:.62rem;font-weight:600;text-transform:uppercase;color:var(--g500);letter-spacing:.03em}
+.chip-v{font-size:.9rem;font-weight:700;color:var(--gp);font-family:'DM Mono',monospace}
+
+/* SCENARIO TABS */
+.scen-tabs{display:flex;gap:4px;margin-bottom:12px}
+.stab{padding:5px 14px;border-radius:999px;border:1.5px solid var(--g200);font-size:.75rem;font-weight:500;cursor:pointer;transition:all .15s;color:var(--g500);background:#fff}
+.stab:hover:not(.active){border-color:var(--gm);color:var(--gm)}
+.stab.active.cons{background:#dc2626;border-color:#dc2626;color:#fff}
+.stab.active.base{background:var(--gm);border-color:var(--gm);color:#fff}
+.stab.active.opti{background:var(--green);border-color:var(--green);color:#fff}
+.scen-panel{display:none}.scen-panel.active{display:block}
+
+/* FCR HISTORY TABLE */
+.fcr-hist{width:100%;border-collapse:collapse;font-size:.72rem;margin-top:6px}
+.fcr-hist th{background:var(--g100);padding:4px 8px;text-align:center;color:var(--g700);font-weight:600;font-size:.65rem}
+.fcr-hist td{padding:4px 8px;text-align:center;border:1px solid var(--g100);font-family:'DM Mono',monospace}
+.fcr-hist tr.fcr-active td{background:var(--gpa);font-weight:700;color:var(--gp)}
+
+/* BUTTONS */
+.btn{display:inline-flex;align-items:center;gap:6px;padding:9px 18px;border-radius:8px;border:none;cursor:pointer;font-family:'Outfit',sans-serif;font-size:.82rem;font-weight:600;transition:all .15s}
+.btn-primary{background:var(--gm);color:#fff}
+.btn-primary:hover{background:var(--gp)}
+.btn-secondary{background:var(--g100);color:var(--g700);border:1px solid var(--g200)}
+.btn-secondary:hover{background:var(--g200)}
+.btn-green{background:var(--green);color:#fff}
+.btn-green:hover{background:#15803d}
+.btn-gold{background:var(--gold);color:#fff}
+.btn-gold:hover{background:#d97706}
+.btn-lg{padding:11px 24px;font-size:.9rem}
+
+/* PROGRESS */
+.progress-wrap{display:none;margin-top:12px}
+.progress-wrap.visible{display:block}
+.prog-bar{height:8px;background:var(--g200);border-radius:4px;overflow:hidden}
+.prog-fill{height:100%;background:var(--gm);border-radius:4px;transition:width .3s}
+.prog-label{font-size:.72rem;color:var(--g500);margin-top:4px}
+
+/* MODEL SELECTOR */
+.model-sel{display:flex;gap:8px;flex-wrap:wrap}
+.msb{flex:1;min-width:140px;padding:12px 14px;border-radius:10px;border:2px solid var(--g200);background:#fff;cursor:pointer;text-align:left;font-family:'Outfit',sans-serif;transition:all .15s}
+.msb:hover:not(.active){border-color:var(--gm)}
+.msb.active{border-color:var(--gm);background:var(--gpa)}
+.msb-icon{font-size:1.3rem;margin-bottom:4px}
+.msb-title{font-size:.82rem;font-weight:700;color:var(--g900)}
+.msb-sub{font-size:.68rem;color:var(--g500);margin-top:2px}
+
+/* RESULTS */
+.res-header{background:linear-gradient(135deg,var(--gd),var(--gp));border-radius:var(--rad);padding:16px 20px;color:#fff;margin-bottom:16px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px}
+.res-title{font-size:1rem;font-weight:700}
+.res-sub{font-size:.72rem;opacity:.7;margin-top:2px}
+
+/* KPI GRID */
+.kg{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-bottom:16px}
+@media(max-width:900px){.kg{grid-template-columns:repeat(3,1fr)}}
+.kpi{background:var(--w);border-radius:10px;box-shadow:var(--sh);padding:11px 13px}
+.kpi.blue{background:var(--gpa)}.kpi.green{background:var(--greenp)}.kpi.gold{background:var(--goldp)}.kpi.teal{background:var(--tealp)}.kpi.red{background:#fee2e2}
+.kl{font-size:.61rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--g400);margin-bottom:3px}
+.kpi.blue .kl{color:#1d4ed8}.kpi.green .kl{color:var(--green)}.kpi.gold .kl{color:#b45309}.kpi.teal .kl{color:var(--teal)}.kpi.red .kl{color:var(--red)}
+.kv{font-size:1.35rem;font-weight:700;letter-spacing:-.03em;line-height:1}
+.kpi.blue .kv{color:var(--gp)}.kpi.green .kv{color:var(--green)}.kpi.gold .kv{color:#b45309}.kpi.teal .kv{color:var(--teal)}.kpi.red .kv{color:var(--red)}
+.ks{font-size:.62rem;color:var(--g400);margin-top:2px}
+
+/* REVENUE TABLE */
+.rev-table{width:100%;border-collapse:collapse;font-size:.78rem}
+.rev-table th{padding:7px 10px;text-align:right;color:var(--g500);font-weight:600;font-size:.66rem;text-transform:uppercase;letter-spacing:.03em;border-bottom:2px solid var(--g100)}
+.rev-table th:first-child{text-align:left}
+.rev-table td{padding:7px 10px;text-align:right;border-bottom:1px solid var(--g50)}
+.rev-table td:first-child{text-align:left;font-weight:500}
+.rev-table tr:hover td{background:var(--g50)}
+.rev-table .total-row td{font-weight:700;background:var(--g100);border-top:2px solid var(--g200)}
+.rev-table .deduct-row td{color:var(--red)}
+.rev-table .net-row td{background:var(--gpa);color:var(--gp);font-weight:700}
+.rev-bar{display:flex;align-items:center;gap:6px}
+.rev-bar-fill{height:8px;border-radius:4px;min-width:2px;transition:width .3s}
+.pos{color:var(--green)}.neg{color:var(--red)}
+
+/* SCENARIO COMPARISON */
+.scen-compare{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+.scen-col{border-radius:10px;overflow:hidden;border:2px solid var(--g200)}
+.scen-col.base{border-color:var(--gm)}
+.scen-header{padding:10px 14px;font-weight:700;font-size:.82rem;text-align:center}
+.scen-col.cons .scen-header{background:#fee2e2;color:var(--red)}
+.scen-col.base .scen-header{background:var(--gpa);color:var(--gp)}
+.scen-col.opti .scen-header{background:var(--greenp);color:var(--green)}
+.scen-row{display:flex;justify-content:space-between;padding:6px 14px;border-bottom:1px solid var(--g100);font-size:.76rem}
+.scen-row:last-child{border-bottom:none}
+.scen-label{color:var(--g500)}
+.scen-val{font-weight:600;font-family:'DM Mono',monospace}
+
+/* CF TABLE */
+.cf-table{width:100%;border-collapse:collapse;font-size:.72rem}
+.cf-table th{padding:5px 7px;text-align:right;color:var(--g500);font-weight:600;font-size:.62rem;text-transform:uppercase;border-bottom:2px solid var(--g100);white-space:nowrap}
+.cf-table th:first-child{text-align:left}
+.cf-table td{padding:4px 7px;text-align:right;border-bottom:1px solid var(--g50);font-family:'DM Mono',monospace;font-size:.68rem}
+.cf-table td:first-child{font-family:'Outfit',sans-serif;font-weight:500;color:var(--g700);font-size:.7rem}
+.cf-table tr:hover td{background:var(--g50)}
+.cf-table tfoot td{font-weight:700;background:var(--g100);border-top:2px solid var(--g200)}
+
+/* CHART WRAP */
+.cw{position:relative;height:260px}
+.cw-sm{position:relative;height:200px}
+
+/* TOGGLE */
+.toggle-btn{width:100%;background:var(--g50);border:none;padding:9px 16px;text-align:left;cursor:pointer;font-family:'Outfit',sans-serif;font-size:.78rem;font-weight:600;color:var(--g700);display:flex;align-items:center;justify-content:space-between;border-top:1px solid var(--g100);transition:background .15s}
+.toggle-btn:hover{background:var(--g100)}
+.toggle-btn .chev{font-size:10px;transition:transform .2s}
+.toggle-btn.open .chev{transform:rotate(180deg)}
+.toggle-body{display:none;padding:12px 16px;background:var(--g50);border-top:1px solid var(--g100)}
+.toggle-body.open{display:block}
+
+.hidden{display:none!important}
+footer{text-align:center;padding:14px;font-size:.65rem;color:var(--g400)}
+</style>
+</head>
+<body>
+<header>
+  <div class="hi">
+    <div class="lb">
+      <div class="li">🔋</div>
+      <div class="lt">
+        <h1>We Green Invest · Simulateur BESS — Tiers-Investissement</h1>
+        <p>Modélisation revenus batterie sur profils quart-horaires réels · Usage interne WGI</p>
+      </div>
+    </div>
+    <div class="hbadge">🔒 Confidentiel</div>
+  </div>
+</header>
+
+<div class="nav">
+  <div class="nav-inner">
+    <div class="ntab active" data-tab="t1">📁 Données <span class="badge" id="badge-data">—</span></div>
+    <div class="ntab" data-tab="t2">🔋 Batterie & Site</div>
+    <div class="ntab" data-tab="t3">⚡ Scénarios Revenus</div>
+    <div class="ntab" data-tab="t4">💶 Financement</div>
+    <div class="ntab" data-tab="t5">📊 Résultats <span class="badge" id="badge-res">Non calculé</span></div>
+  </div>
+</div>
+
+<main>
+
+<!-- ═══ TAB 1: DONNÉES ═══ -->
+<div class="tab-section active" id="t1">
+  <div class="card">
+    <div class="ch"><div class="ico">📋</div><h2>Coller les données quart-horaires</h2><div class="sub">CSV, TSV ou copie directe depuis Excel</div></div>
+    <div class="cb">
+      <div class="ib" style="margin-bottom:10px">
+        Collez vos données avec les colonnes suivantes (ordre libre, headers en ligne 1) :<br/>
+        <strong>Timestamp</strong> · <strong>Consommation [kW ou kWh/15min]</strong> · <strong>Production PV [kW ou kWh]</strong> (optionnel) · <strong>Prix Spot [€/MWh]</strong> (optionnel)
+      </div>
+      <textarea class="paste-area" id="paste-data" placeholder="Collez vos données ici...&#10;Exemple :&#10;Timestamp;Consommation [kWh];Injection [kWh];Production PV [kWh]&#10;01/01/2023 00:15;1.250;0.000;0.000&#10;01/01/2023 00:30;1.180;0.000;0.000&#10;..."></textarea>
+      <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
+        <button class="btn btn-primary" onclick="parseData()">🔍 Analyser les données</button>
+        <button class="btn btn-secondary" onclick="loadSampleData()">📂 Charger données exemple</button>
+        <button class="btn btn-secondary" onclick="clearData()">🗑 Effacer</button>
+      </div>
+      <div class="progress-wrap" id="parse-progress">
+        <div class="prog-bar"><div class="prog-fill" id="parse-fill" style="width:0%"></div></div>
+        <div class="prog-label" id="parse-label">Analyse en cours...</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card colmap" id="colmap-card">
+    <div class="ch"><div class="ico">🗂</div><h2>Correspondance des colonnes</h2></div>
+    <div class="cb">
+      <div class="colmap-grid" id="colmap-grid"></div>
+      <div class="data-preview" id="data-preview"></div>
+      <div class="stat-chips" id="data-stats"></div>
+      <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn btn-green btn-lg" onclick="confirmMapping()">✓ Confirmer & préparer simulation</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ TAB 2: BATTERIE & SITE ═══ -->
+<div class="tab-section" id="t2">
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+    <div>
+      <div class="card">
+        <div class="ch"><div class="ico">🔋</div><h2>Configuration Batterie</h2></div>
+        <div class="cb">
+          <div class="g2">
+            <div class="f"><label>Capacité nominale</label><div class="ir"><input type="number" id="batt-cap" value="215" min="1" max="10000" step="1"/><div class="iu">kWh</div></div></div>
+            <div class="f"><label>Puissance nominale</label><div class="ir"><input type="number" id="batt-pow" value="100" min="1" max="5000" step="1"/><div class="iu">kW</div></div></div>
+            <div class="f"><label>Efficacité round-trip</label><div class="ir"><input type="number" id="batt-eff" value="92" min="50" max="99" step="0.5"/><div class="iu">%</div></div></div>
+            <div class="f"><label>SoC minimum</label><div class="ir"><input type="number" id="batt-soc-min" value="10" min="0" max="50" step="1"/><div class="iu">%</div></div></div>
+            <div class="f"><label>SoC maximum</label><div class="ir"><input type="number" id="batt-soc-max" value="90" min="50" max="100" step="1"/><div class="iu">%</div></div></div>
+            <div class="f"><label>Dégradation annuelle</label><div class="ir"><input type="number" id="batt-deg" value="2.0" min="0" max="10" step="0.1"/><div class="iu">%/an</div></div></div>
+            <div class="f"><label>Durée de vie</label><div class="ir"><input type="number" id="batt-life" value="15" min="5" max="25" step="1"/><div class="iu">ans</div></div></div>
+            <div class="f"><label>Technologie</label><select id="batt-tech"><option value="lfp">LFP (Li-Ion)</option><option value="nmc">NMC (Li-Ion)</option><option value="nass">Na-Ion</option></select></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="ch"><div class="ico">⚡</div><h2>Stratégie de dispatch</h2></div>
+        <div class="cb">
+          <div class="f"><label>Priorité principale</label>
+            <select id="dispatch-strategy">
+              <option value="combined">Combinée (autoconso + peak + arbitrage)</option>
+              <option value="autoconso">Autoconsommation en priorité</option>
+              <option value="peak">Peak shaving en priorité</option>
+              <option value="arbitrage">Arbitrage en priorité</option>
+            </select>
+          </div>
+          <div class="f"><label>Seuil de décharge peak shaving <span class="h">(% de la pointe max historique)</span></label>
+            <div class="ir"><input type="number" id="peak-threshold-pct" value="80" min="30" max="100" step="1"/><div class="iu">%</div></div>
+          </div>
+          <div class="ib" style="margin-top:8px">
+            En mode combiné : 1. Absorber surplus PV → 2. Peak shaving → 3. Arbitrage (prix jour/nuit ou prix spot si disponible)
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div>
+      <div class="card">
+        <div class="ch"><div class="ico">🏭</div><h2>Paramètres Site</h2></div>
+        <div class="cb">
+          <div class="sec">Région & Raccordement</div>
+          <div class="g2">
+            <div class="f"><label>Région</label>
+              <select id="site-region">
+                <option value="wallonie">Wallonie</option>
+                <option value="bruxelles">Bruxelles</option>
+                <option value="flandre">Flandre</option>
+              </select>
+            </div>
+            <div class="f"><label>Limite de raccordement</label><div class="ir"><input type="number" id="site-grid-limit" value="172.5" min="10" max="5000" step="0.5"/><div class="iu">kW</div></div></div>
+          </div>
+          <div class="sec">Tarifs Offtake / Injection</div>
+          <div class="g2">
+            <div class="f"><label>Offtake Heures Pleines</label><div class="ir"><input type="number" id="tarif-offtake-hp" value="290" min="0" max="1000" step="1"/><div class="iu">€/MWh</div></div></div>
+            <div class="f"><label>Offtake Heures Creuses</label><div class="ir"><input type="number" id="tarif-offtake-hc" value="200" min="0" max="1000" step="1"/><div class="iu">€/MWh</div></div></div>
+            <div class="f"><label>Injection HP</label><div class="ir"><input type="number" id="tarif-inject-hp" value="70" min="0" max="500" step="1"/><div class="iu">€/MWh</div></div></div>
+            <div class="f"><label>Injection HC</label><div class="ir"><input type="number" id="tarif-inject-hc" value="50" min="0" max="500" step="1"/><div class="iu">€/MWh</div></div></div>
+          </div>
+          <div class="sec">Tarifs de Puissance</div>
+          <div class="g2">
+            <div class="f"><label>Tarif mensuel de pointe</label><div class="ir"><input type="number" id="tarif-monthly-peak" value="6.76" min="0" max="50" step="0.01"/><div class="iu">€/kW/mois</div></div></div>
+            <div class="f"><label>Tarif annuel de pointe</label><div class="ir"><input type="number" id="tarif-yearly-peak" value="40.54" min="0" max="200" step="0.01"/><div class="iu">€/kW/an</div></div></div>
+          </div>
+          <div class="sec">Heures de pointe</div>
+          <div class="g2">
+            <div class="f"><label>Début HP (heure locale)</label><div class="ir"><input type="number" id="hp-start" value="7" min="0" max="23" step="1"/><div class="iu">h</div></div></div>
+            <div class="f"><label>Fin HP (heure locale)</label><div class="ir"><input type="number" id="hp-end" value="22" min="0" max="23" step="1"/><div class="iu">h</div></div></div>
+          </div>
+          <div class="ib" style="margin-top:8px;font-size:.68rem">HP : lundi–vendredi de <strong id="hp-display">7h à 22h</strong> · HC : reste du temps + weekends</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ TAB 3: SCÉNARIOS REVENUS ═══ -->
+<div class="tab-section" id="t3">
+  <div class="card" style="margin-bottom:16px">
+    <div class="ch"><div class="ico">ℹ️</div><h2>Logique des scénarios</h2></div>
+    <div class="cb">
+      <div class="ib">
+        <strong>Autoconsommation & Peak shaving</strong> : calculés par simulation réelle sur vos profils quart-horaires.<br/>
+        <strong>Arbitrage Day-Ahead</strong> : calculé par simulation (prix spot si fournis) OU estimé sur base de spread jour/nuit.<br/>
+        <strong>FCR / aFRR</strong> : revenus estimés (P_réservée × prix marché × disponibilité). Les prix historiques sont affichables et modifiables par scénario.
+      </div>
+    </div>
+  </div>
+
+  <div class="scen-tabs">
+    <button class="stab active cons" data-scen="cons">🔴 Conservateur</button>
+    <button class="stab base" data-scen="base">🔵 Base</button>
+    <button class="stab opti" data-scen="opti">🟢 Optimiste</button>
+  </div>
+
+  <div class="scen-panel active" id="scen-cons">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+      <div>
+        <div class="card">
+          <div class="ch"><div class="ico">🔄</div><h2>FCR — Réserve de Fréquence</h2></div>
+          <div class="cb">
+            <div class="g2">
+              <div class="f"><label>% Batterie réservé FCR</label><div class="ir"><input type="number" id="cons-fcr-frac" value="30" min="0" max="100" step="5"/><div class="iu">%</div></div></div>
+              <div class="f"><label>Disponibilité</label><div class="ir"><input type="number" id="cons-fcr-avail" value="90" min="0" max="100" step="1"/><div class="iu">%</div></div></div>
+              <div class="f"><label>Prix FCR retenu</label><div class="ir"><input type="number" id="cons-fcr-price" value="19.67" min="0" max="200" step="0.01"/><div class="iu">€/MW/h</div></div></div>
+              <div class="f"><label>% Commission agrégateur</label><div class="ir"><input type="number" id="cons-fcr-agg" value="38" min="0" max="60" step="1"/><div class="iu">%</div></div></div>
+            </div>
+            <table class="fcr-hist"><thead><tr><th>Année</th><th>Prix FCR belge (€/MW/h)</th></tr></thead>
+            <tbody>
+              <tr><td>2021</td><td>33.00</td></tr><tr><td>2022</td><td>34.82</td></tr>
+              <tr><td>2023</td><td>26.25</td></tr><tr><td>2024</td><td>43.73</td></tr>
+              <tr class="fcr-active"><td>2025</td><td>19.67</td></tr>
+            </tbody></table>
+          </div>
+        </div>
+        <div class="card">
+          <div class="ch"><div class="ico">⚡</div><h2>aFRR — Réserve de Restauration auto.</h2></div>
+          <div class="cb">
+            <div class="g2">
+              <div class="f"><label>% Batterie réservé aFRR</label><div class="ir"><input type="number" id="cons-afrr-frac" value="0" min="0" max="100" step="5"/><div class="iu">%</div></div></div>
+              <div class="f"><label>Disponibilité</label><div class="ir"><input type="number" id="cons-afrr-avail" value="85" min="0" max="100" step="1"/><div class="iu">%</div></div></div>
+              <div class="f"><label>Prix aFRR retenu</label><div class="ir"><input type="number" id="cons-afrr-price" value="8" min="0" max="200" step="0.1"/><div class="iu">€/MW/h</div></div></div>
+              <div class="f"><label>% Commission agrégateur</label><div class="ir"><input type="number" id="cons-afrr-agg" value="38" min="0" max="60" step="1"/><div class="iu">%</div></div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div>
+        <div class="card">
+          <div class="ch"><div class="ico">📈</div><h2>Arbitrage Day-Ahead / Intraday</h2></div>
+          <div class="cb">
+            <div class="f"><label>Utiliser les prix spot des données <span class="h">(si fournis)</span></label>
+              <select id="cons-arb-mode">
+                <option value="auto">Automatique (spot si dispo, sinon TOU)</option>
+                <option value="tou">Tarif Jour/Nuit uniquement</option>
+                <option value="disabled">Désactivé</option>
+              </select>
+            </div>
+            <div class="f"><label>Spread arbitrage estimé <span class="h">(si pas de prix spot)</span></label><div class="ir"><input type="number" id="cons-arb-spread" value="40" min="0" max="300" step="1"/><div class="iu">€/MWh</div></div></div>
+            <div class="f"><label>Nb cycles arbitrage / jour estimé</label><div class="ir"><input type="number" id="cons-arb-cycles" value="0.5" min="0" max="3" step="0.1"/><div class="iu">cycles/jour</div></div></div>
+            <div class="ib warn" style="margin-top:6px">Scénario conservateur : arbitrage limité, prix FCR bas 2025.</div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="ch"><div class="ico">📊</div><h2>Imbalance Market</h2></div>
+          <div class="cb">
+            <div class="f"><label>Revenus imbalance estimés <span class="h">(€/kWh capacité/an)</span></label>
+              <div class="ir"><input type="number" id="cons-imbal" value="0" min="0" max="200" step="1"/><div class="iu">€/kWh/an</div></div>
+            </div>
+            <div class="ib" style="margin-top:6px;font-size:.68rem">Revenus imbalance très volatils — désactivé en scénario conservateur. Activer en Base/Optimiste si accord agrégateur.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Base scenario (same structure, different values) -->
+  <div class="scen-panel" id="scen-base">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+      <div>
+        <div class="card">
+          <div class="ch"><div class="ico">🔄</div><h2>FCR — Scénario Base</h2></div>
+          <div class="cb">
+            <div class="g2">
+              <div class="f"><label>% Batterie réservé FCR</label><div class="ir"><input type="number" id="base-fcr-frac" value="40" min="0" max="100" step="5"/><div class="iu">%</div></div></div>
+              <div class="f"><label>Disponibilité</label><div class="ir"><input type="number" id="base-fcr-avail" value="93" min="0" max="100" step="1"/><div class="iu">%</div></div></div>
+              <div class="f"><label>Prix FCR retenu</label><div class="ir"><input type="number" id="base-fcr-price" value="30" min="0" max="200" step="0.5"/><div class="iu">€/MW/h</div></div></div>
+              <div class="f"><label>% Commission agrégateur</label><div class="ir"><input type="number" id="base-fcr-agg" value="38" min="0" max="60" step="1"/><div class="iu">%</div></div></div>
+            </div>
+            <div class="ib" style="margin-top:8px">Prix moyen 2021–2024 : ~34 €/MW/h. Scénario base retient 30 €/MW/h par prudence.</div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="ch"><div class="ico">⚡</div><h2>aFRR — Scénario Base</h2></div>
+          <div class="cb">
+            <div class="g2">
+              <div class="f"><label>% Batterie réservé aFRR</label><div class="ir"><input type="number" id="base-afrr-frac" value="10" min="0" max="100" step="5"/><div class="iu">%</div></div></div>
+              <div class="f"><label>Disponibilité</label><div class="ir"><input type="number" id="base-afrr-avail" value="88" min="0" max="100" step="1"/><div class="iu">%</div></div></div>
+              <div class="f"><label>Prix aFRR retenu</label><div class="ir"><input type="number" id="base-afrr-price" value="12" min="0" max="200" step="0.5"/><div class="iu">€/MW/h</div></div></div>
+              <div class="f"><label>% Commission agrégateur</label><div class="ir"><input type="number" id="base-afrr-agg" value="35" min="0" max="60" step="1"/><div class="iu">%</div></div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div>
+        <div class="card">
+          <div class="ch"><div class="ico">📈</div><h2>Arbitrage — Scénario Base</h2></div>
+          <div class="cb">
+            <div class="f"><label>Mode arbitrage</label>
+              <select id="base-arb-mode">
+                <option value="auto" selected>Automatique (spot si dispo, sinon TOU)</option>
+                <option value="tou">Tarif Jour/Nuit uniquement</option>
+                <option value="disabled">Désactivé</option>
+              </select>
+            </div>
+            <div class="f"><label>Spread arbitrage estimé</label><div class="ir"><input type="number" id="base-arb-spread" value="60" min="0" max="300" step="1"/><div class="iu">€/MWh</div></div></div>
+            <div class="f"><label>Nb cycles arbitrage / jour</label><div class="ir"><input type="number" id="base-arb-cycles" value="1.0" min="0" max="3" step="0.1"/><div class="iu">cycles/jour</div></div></div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="ch"><div class="ico">📊</div><h2>Imbalance — Scénario Base</h2></div>
+          <div class="cb">
+            <div class="f"><label>Revenus imbalance estimés</label><div class="ir"><input type="number" id="base-imbal" value="5" min="0" max="200" step="1"/><div class="iu">€/kWh/an</div></div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Optimiste scenario -->
+  <div class="scen-panel" id="scen-opti">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+      <div>
+        <div class="card">
+          <div class="ch"><div class="ico">🔄</div><h2>FCR — Scénario Optimiste</h2></div>
+          <div class="cb">
+            <div class="g2">
+              <div class="f"><label>% Batterie réservé FCR</label><div class="ir"><input type="number" id="opti-fcr-frac" value="50" min="0" max="100" step="5"/><div class="iu">%</div></div></div>
+              <div class="f"><label>Disponibilité</label><div class="ir"><input type="number" id="opti-fcr-avail" value="96" min="0" max="100" step="1"/><div class="iu">%</div></div></div>
+              <div class="f"><label>Prix FCR retenu</label><div class="ir"><input type="number" id="opti-fcr-price" value="43.73" min="0" max="200" step="0.01"/><div class="iu">€/MW/h</div></div></div>
+              <div class="f"><label>% Commission agrégateur</label><div class="ir"><input type="number" id="opti-fcr-agg" value="35" min="0" max="60" step="1"/><div class="iu">%</div></div></div>
+            </div>
+            <div class="ib ok" style="margin-top:8px">Prix 2024 (43.73 €/MW/h) retenu pour scénario optimiste.</div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="ch"><div class="ico">⚡</div><h2>aFRR — Scénario Optimiste</h2></div>
+          <div class="cb">
+            <div class="g2">
+              <div class="f"><label>% Batterie réservé aFRR</label><div class="ir"><input type="number" id="opti-afrr-frac" value="15" min="0" max="100" step="5"/><div class="iu">%</div></div></div>
+              <div class="f"><label>Disponibilité</label><div class="ir"><input type="number" id="opti-afrr-avail" value="92" min="0" max="100" step="1"/><div class="iu">%</div></div></div>
+              <div class="f"><label>Prix aFRR retenu</label><div class="ir"><input type="number" id="opti-afrr-price" value="18" min="0" max="200" step="0.5"/><div class="iu">€/MW/h</div></div></div>
+              <div class="f"><label>% Commission agrégateur</label><div class="ir"><input type="number" id="opti-afrr-agg" value="30" min="0" max="60" step="1"/><div class="iu">%</div></div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div>
+        <div class="card">
+          <div class="ch"><div class="ico">📈</div><h2>Arbitrage — Scénario Optimiste</h2></div>
+          <div class="cb">
+            <div class="f"><label>Mode arbitrage</label>
+              <select id="opti-arb-mode">
+                <option value="auto" selected>Automatique (spot si dispo, sinon TOU)</option>
+                <option value="tou">Tarif Jour/Nuit uniquement</option>
+                <option value="disabled">Désactivé</option>
+              </select>
+            </div>
+            <div class="f"><label>Spread arbitrage estimé</label><div class="ir"><input type="number" id="opti-arb-spread" value="80" min="0" max="300" step="1"/><div class="iu">€/MWh</div></div></div>
+            <div class="f"><label>Nb cycles arbitrage / jour</label><div class="ir"><input type="number" id="opti-arb-cycles" value="1.5" min="0" max="3" step="0.1"/><div class="iu">cycles/jour</div></div></div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="ch"><div class="ico">📊</div><h2>Imbalance — Scénario Optimiste</h2></div>
+          <div class="cb">
+            <div class="f"><label>Revenus imbalance estimés</label><div class="ir"><input type="number" id="opti-imbal" value="15" min="0" max="200" step="1"/><div class="iu">€/kWh/an</div></div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ TAB 4: FINANCEMENT ═══ -->
+<div class="tab-section" id="t4">
+  <div class="card" style="margin-bottom:16px">
+    <div class="ch"><div class="ico">💶</div><h2>Modèle de financement</h2></div>
+    <div class="cb">
+      <div class="model-sel" id="fin-model-sel">
+        <button class="msb active" data-model="tiers">
+          <div class="msb-icon">🤝</div>
+          <div class="msb-title">Tiers-Investissement</div>
+          <div class="msb-sub">WGI finance, revenus partagés après déductions</div>
+        </button>
+        <button class="msb" data-model="propres">
+          <div class="msb-icon">🏢</div>
+          <div class="msb-title">Fonds Propres Client</div>
+          <div class="msb-sub">Client finance, tous les revenus nets lui reviennent</div>
+        </button>
+        <button class="msb" data-model="leasing">
+          <div class="msb-icon">📋</div>
+          <div class="msb-title">Leasing</div>
+          <div class="msb-sub">Client paie un loyer fixe à WGI</div>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+    <div>
+      <div class="card">
+        <div class="ch"><div class="ico">🏗️</div><h2>CAPEX & OPEX</h2></div>
+        <div class="cb">
+          <div class="sec">Investissement</div>
+          <div class="g2">
+            <div class="f"><label>CAPEX Batterie</label><div class="ir"><input type="number" id="fin-capex-batt" value="44075" min="0" max="10000000" step="100"/><div class="iu">€</div></div></div>
+            <div class="f"><label>CAPEX Installation</label><div class="ir"><input type="number" id="fin-capex-install" value="5000" min="0" max="1000000" step="100"/><div class="iu">€</div></div></div>
+            <div class="f"><label>Provision recyclage</label><div class="ir"><input type="number" id="fin-capex-recycle" value="4400" min="0" max="100000" step="100"/><div class="iu">€</div></div></div>
+            <div class="f"><label>Subside / déduction</label><div class="ir"><input type="number" id="fin-capex-subsidy" value="0" min="0" max="500000" step="100"/><div class="iu">€</div></div></div>
+          </div>
+          <div class="dr" style="padding:8px 0;margin-top:4px;border-top:2px solid var(--g200)">
+            <span style="font-size:.78rem;font-weight:600">CAPEX Net total</span>
+            <span style="font-family:'DM Mono',monospace;font-weight:700;color:var(--gp)" id="capex-net-display">—</span>
+          </div>
+          <div class="sec">Coûts annuels</div>
+          <div class="g2">
+            <div class="f"><label>OPEX / Maintenance</label><div class="ir"><input type="number" id="fin-opex" value="1200" min="0" max="100000" step="100"/><div class="iu">€/an</div></div></div>
+            <div class="f"><label>EMS / Software</label><div class="ir"><input type="number" id="fin-ems" value="200" min="0" max="50000" step="50"/><div class="iu">€/an</div></div></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card" id="fin-tiers-card">
+        <div class="ch"><div class="ico">🤝</div><h2>Partage des revenus (Tiers-Invest)</h2></div>
+        <div class="cb">
+          <div class="ib" style="margin-bottom:10px">
+            Revenus nets = Total brut − Frais agrégateurs − EMS − OPEX<br/>
+            WGI déduit ensuite les coûts de financement de sa part.
+          </div>
+          <div class="g2">
+            <div class="f"><label>Part WGI (des revenus nets)</label><div class="ir"><input type="number" id="fin-wgi-share" value="60" min="1" max="99" step="1"/><div class="iu">%</div></div></div>
+            <div class="f"><label>Part Client</label><div class="ir"><input type="number" id="fin-client-share-disp" value="40" disabled/><div class="iu">%</div></div></div>
+          </div>
+          <div class="sec">Financement WGI</div>
+          <div class="g2">
+            <div class="f"><label>% Financement bancaire</label><div class="ir"><input type="number" id="fin-debt-ratio" value="70" min="0" max="100" step="1"/><div class="iu">%</div></div></div>
+            <div class="f"><label>% Fonds propres WGI</label><div class="ir"><input type="number" id="fin-equity-disp" value="30" disabled/><div class="iu">%</div></div></div>
+            <div class="f"><label>Taux intérêt bancaire</label><div class="ir"><input type="number" id="fin-loan-rate" value="4.5" min="0" max="20" step="0.1"/><div class="iu">%/an</div></div></div>
+            <div class="f"><label>Durée prêt</label><div class="ir"><input type="number" id="fin-loan-years" value="7" min="1" max="20" step="1"/><div class="iu">ans</div></div></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card hidden" id="fin-leasing-card">
+        <div class="ch"><div class="ico">📋</div><h2>Leasing</h2></div>
+        <div class="cb">
+          <div class="g2">
+            <div class="f"><label>Loyer annuel (fixe)</label><div class="ir"><input type="number" id="fin-lease-annual" value="8000" min="0" max="500000" step="100"/><div class="iu">€/an</div></div></div>
+            <div class="f"><label>Durée du leasing</label><div class="ir"><input type="number" id="fin-lease-years" value="15" min="1" max="25" step="1"/><div class="iu">ans</div></div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div>
+      <div class="card">
+        <div class="ch"><div class="ico">📐</div><h2>Hypothèses financières</h2></div>
+        <div class="cb">
+          <div class="g2">
+            <div class="f"><label>WACC (taux actualisation)</label><div class="ir"><input type="number" id="fin-wacc" value="8" min="1" max="25" step="0.5"/><div class="iu">%</div></div></div>
+            <div class="f"><label>Durée du contrat</label><div class="ir"><input type="number" id="fin-duration" value="15" min="5" max="25" step="1"/><div class="iu">ans</div></div></div>
+            <div class="f"><label>Inflation annuelle revenus</label><div class="ir"><input type="number" id="fin-inflation" value="1.5" min="-5" max="10" step="0.5"/><div class="iu">%/an</div></div></div>
+            <div class="f"><label>TVA applicable</label>
+              <select id="fin-tva"><option value="0">0%</option><option value="6">6%</option><option value="21" selected>21%</option></select>
+            </div>
+          </div>
+          <div class="ib" style="margin-top:8px">
+            WACC Battscan de référence : <strong>8%</strong>. Durée de vie batterie : 15 ans.
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="ch"><div class="ico">🔢</div><h2>Récapitulatif CAPEX</h2></div>
+        <div class="cb" id="capex-recap">
+          <div class="stat-chips">
+            <div class="chip"><div class="chip-l">CAPEX Brut</div><div class="chip-v" id="r-capex-brut">—</div></div>
+            <div class="chip"><div class="chip-l">CAPEX Net</div><div class="chip-v" id="r-capex-net">—</div></div>
+            <div class="chip"><div class="chip-l">Fonds propres WGI</div><div class="chip-v" id="r-equity">—</div></div>
+            <div class="chip"><div class="chip-l">Emprunt</div><div class="chip-v" id="r-debt">—</div></div>
+            <div class="chip"><div class="chip-l">Annuité bancaire</div><div class="chip-v" id="r-annuity">—</div></div>
+          </div>
+        </div>
+      </div>
+
+      <div style="margin-top:16px">
+        <button class="btn btn-green btn-lg" style="width:100%;justify-content:center" onclick="runSimulation()">
+          🚀 Lancer la simulation et calculer les résultats
+        </button>
+        <div class="progress-wrap" id="sim-progress" style="margin-top:10px">
+          <div class="prog-bar"><div class="prog-fill" id="sim-fill" style="width:0%"></div></div>
+          <div class="prog-label" id="sim-label">Initialisation...</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ TAB 5: RÉSULTATS ═══ -->
+<div class="tab-section" id="t5">
+  <div id="res-placeholder" class="card">
+    <div class="cb" style="text-align:center;padding:40px">
+      <div style="font-size:2rem;margin-bottom:10px">📊</div>
+      <div style="font-weight:600;color:var(--g700)">Aucun résultat disponible</div>
+      <div style="color:var(--g400);font-size:.82rem;margin-top:4px">Importez des données, configurez les paramètres et lancez la simulation depuis l'onglet Financement.</div>
+    </div>
+  </div>
+
+  <div id="res-content" class="hidden">
+
+    <!-- Header résultats -->
+    <div class="res-header">
+      <div>
+        <div class="res-title" id="res-title">Résultats de simulation BESS</div>
+        <div class="res-sub" id="res-subtitle">—</div>
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn btn-secondary" onclick="exportResults()">📥 Exporter CSV</button>
+      </div>
+    </div>
+
+    <!-- KPI bar -->
+    <div class="kg" id="res-kpis"></div>
+
+    <!-- SECTION 1: Profil annuel -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px">
+      <div class="card">
+        <div class="ch"><div class="ico">📋</div><h2>Profil annuel — Avant batterie</h2></div>
+        <div class="cb" id="res-baseline"></div>
+      </div>
+      <div class="card">
+        <div class="ch"><div class="ico">🔋</div><h2>Profil annuel — Avec batterie</h2></div>
+        <div class="cb" id="res-withbatt"></div>
+      </div>
+    </div>
+
+    <!-- SECTION 2: Revenus par source -->
+    <div class="card" style="margin-bottom:16px">
+      <div class="ch"><div class="ico">💰</div><h2>Revenus annuels estimés — Scénario Base</h2></div>
+      <div class="cb">
+        <table class="rev-table" id="res-rev-table"></table>
+      </div>
+    </div>
+
+    <!-- SECTION 3: Comparaison scénarios -->
+    <div class="card" style="margin-bottom:16px">
+      <div class="ch"><div class="ico">⚖️</div><h2>Comparaison des 3 scénarios</h2></div>
+      <div class="cb">
+        <div class="scen-compare" id="res-scen-compare"></div>
+      </div>
+    </div>
+
+    <!-- SECTION 4: Charts -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px">
+      <div class="card">
+        <div class="ch"><div class="ico">📊</div><h2>Revenus mensuels par source</h2></div>
+        <div class="cb"><div class="cw"><canvas id="chart-monthly-rev"></canvas></div></div>
+      </div>
+      <div class="card">
+        <div class="ch"><div class="ico">📈</div><h2>Profil hebdomadaire type (batterie)</h2></div>
+        <div class="cb"><div class="cw"><canvas id="chart-weekly"></canvas></div></div>
+      </div>
+    </div>
+
+    <!-- SECTION 5: Business case -->
+    <div class="card">
+      <div class="ch"><div class="ico">💶</div><h2>Business Case WGI — Cash Flows annuels</h2></div>
+      <div class="cb">
+        <div style="overflow-x:auto;max-height:320px;overflow-y:auto">
+          <table class="cf-table" id="res-cf-table"></table>
+        </div>
+        <div class="npv-box" id="res-npv-box" style="margin-top:12px;background:var(--gpa);border:1px solid var(--gl);border-radius:9px;padding:12px 16px">
+          <div style="font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--gm);margin-bottom:8px">Synthèse Valeur & Rentabilité</div>
+          <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:10px" id="res-npv-grid"></div>
+          <div style="font-size:.65rem;color:var(--g400);margin-top:8px;text-align:center;border-top:1px solid var(--g200);padding-top:6px" id="res-npv-note">—</div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+</main>
+<footer>We Green Invest · Simulateur BESS v1.0 · Simulation dispatch sur profils quart-horaires réels · Résultats indicatifs · Confidentiel</footer>
+
+<script>
+// ═══════════════════════════════════════════════════════════
+// STATE
+// ═══════════════════════════════════════════════════════════
+const S = {
+  rawSlots: null,      // parsed 15-min slots
+  colMap: {},          // column assignments
+  simResults: null,    // simulation output
+  finModel: 'tiers',   // active financial model
+};
+
+const fmt = (v,d=0) => (v==null||isNaN(v)) ? '—' : v.toLocaleString('fr-BE',{minimumFractionDigits:d,maximumFractionDigits:d});
+const fE  = (v,d=0) => fmt(v,d) + ' €';
+const fP  = (v,d=1) => fmt(v*100,d) + ' %';
+const el  = id => document.getElementById(id);
+
+// ═══════════════════════════════════════════════════════════
+// NAVIGATION
+// ═══════════════════════════════════════════════════════════
+document.querySelectorAll('.ntab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    document.querySelectorAll('.ntab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.tab-section').forEach(s => s.classList.remove('active'));
+    tab.classList.add('active');
+    el('t' + tab.dataset.tab.slice(1)).classList.add('active');
+  });
+});
+
+// ═══════════════════════════════════════════════════════════
+// SCENARIO TABS
+// ═══════════════════════════════════════════════════════════
+document.querySelectorAll('.stab').forEach(t => {
+  t.addEventListener('click', () => {
+    document.querySelectorAll('.stab').forEach(x => x.classList.remove('active'));
+    document.querySelectorAll('.scen-panel').forEach(p => p.classList.remove('active'));
+    t.classList.add('active');
+    el('scen-' + t.dataset.scen).classList.add('active');
+  });
+});
+
+// ═══════════════════════════════════════════════════════════
+// FINANCIAL MODEL SELECTOR
+// ═══════════════════════════════════════════════════════════
+document.querySelectorAll('.msb').forEach(b => {
+  b.addEventListener('click', () => {
+    document.querySelectorAll('.msb').forEach(x => x.classList.remove('active'));
+    b.classList.add('active');
+    S.finModel = b.dataset.model;
+    el('fin-tiers-card').classList.toggle('hidden', S.finModel !== 'tiers');
+    el('fin-leasing-card').classList.toggle('hidden', S.finModel !== 'leasing');
+  });
+});
+
+// Share display sync
+el('fin-wgi-share').addEventListener('input', () => {
+  el('fin-client-share-disp').value = 100 - (parseFloat(el('fin-wgi-share').value)||0);
+});
+el('fin-debt-ratio').addEventListener('input', () => {
+  el('fin-equity-disp').value = 100 - (parseFloat(el('fin-debt-ratio').value)||0);
+  updateCapexRecap();
+});
+
+// HP display
+function updateHPDisplay() {
+  el('hp-display').textContent = (el('hp-start').value||7)+'h à '+(el('hp-end').value||22)+'h';
+}
+el('hp-start').addEventListener('input', updateHPDisplay);
+el('hp-end').addEventListener('input', updateHPDisplay);
+
+// CAPEX auto-update
+['fin-capex-batt','fin-capex-install','fin-capex-recycle','fin-capex-subsidy','fin-debt-ratio','fin-loan-rate','fin-loan-years'].forEach(id => {
+  el(id).addEventListener('input', updateCapexRecap);
+});
+
+function updateCapexRecap() {
+  const brut = (parseFloat(el('fin-capex-batt').value)||0) + (parseFloat(el('fin-capex-install').value)||0) + (parseFloat(el('fin-capex-recycle').value)||0);
+  const net  = brut - (parseFloat(el('fin-capex-subsidy').value)||0);
+  const dr   = (parseFloat(el('fin-debt-ratio').value)||70)/100;
+  const equity = net * (1 - dr);
+  const debt   = net * dr;
+  const lr     = (parseFloat(el('fin-loan-rate').value)||4.5)/100;
+  const ly     = parseInt(el('fin-loan-years').value)||7;
+  const annuity = debt > 0 ? pmt(lr, ly, debt) : 0;
+
+  el('capex-net-display').textContent = fE(net, 0);
+  el('r-capex-brut').textContent = fE(brut, 0);
+  el('r-capex-net').textContent  = fE(net, 0);
+  el('r-equity').textContent     = fE(equity, 0);
+  el('r-debt').textContent       = fE(debt, 0);
+  el('r-annuity').textContent    = fE(annuity, 0) + '/an';
+}
+updateCapexRecap();
+
+// ═══════════════════════════════════════════════════════════
+// DATA PARSING
+// ═══════════════════════════════════════════════════════════
+function detectSep(text) {
+  const firstLine = text.split('\n')[0];
+  const counts = {';': (firstLine.match(/;/g)||[]).length, ',': (firstLine.match(/,/g)||[]).length, '\t': (firstLine.match(/\t/g)||[]).length};
+  return Object.entries(counts).sort((a,b)=>b[1]-a[1])[0][0];
+}
+
+function parseDateTime(s) {
+  if (!s) return null;
+  s = String(s).trim();
+  // ISO: 2023-01-01T00:15
+  let m = s.match(/^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2})/);
+  if (m) return new Date(+m[1],+m[2]-1,+m[3],+m[4],+m[5]);
+  // Belgian: 01/01/2023 00:15 or 01/01/2023 0:15
+  m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})[T ,]+(\d{1,2}):(\d{2})/);
+  if (m) return new Date(+m[3],+m[2]-1,+m[1],+m[4],+m[5]);
+  // Date only + separate time column handled in caller
+  return null;
+}
+
+function parseData() {
+  const raw = el('paste-data').value.trim();
+  if (!raw) { alert('Collez des données dans la zone de texte.'); return; }
+
+  const prog = el('parse-progress');
+  prog.classList.add('visible');
+  el('parse-fill').style.width = '20%';
+  el('parse-label').textContent = 'Détection du séparateur...';
+
+  setTimeout(() => {
+    const sep = detectSep(raw);
+    const lines = raw.split('\n').map(l => l.trim()).filter(l => l);
+    const headers = lines[0].split(sep).map(h => h.trim().replace(/['"]/g,''));
+
+    el('parse-fill').style.width = '50%';
+    el('parse-label').textContent = `${lines.length-1} lignes détectées, ${headers.length} colonnes...`;
+
+    // Render column mapping
+    const mapGrid = el('colmap-grid');
+    mapGrid.innerHTML = '';
+    const roles = ['Ignorer','Timestamp','Consommation (kW ou kWh)','Production PV (kW ou kWh)','Injection réseau (kW ou kWh)','Prix Spot (€/MWh)'];
+    
+    // Auto-detect columns
+    const autoMap = {};
+    headers.forEach((h, i) => {
+      const hl = h.toLowerCase();
+      if (hl.includes('timestamp') || hl.includes('datum') || hl.includes('date') || hl.includes('tijd')) autoMap[i] = 'ts';
+      else if (hl.includes('afname') || hl.includes('conso') || hl.includes('offtake') || hl.includes('kwh') && !hl.includes('inject') && !hl.includes('pv')) autoMap[i] = 'cons';
+      else if (hl.includes('inject') || hl.includes('injectie')) autoMap[i] = 'inj';
+      else if (hl.includes('pv') || hl.includes('solaire') || hl.includes('productie') || hl.includes('produc')) autoMap[i] = 'pv';
+      else if (hl.includes('price') || hl.includes('prix') || hl.includes('spot')) autoMap[i] = 'price';
+    });
+
+    headers.forEach((h, i) => {
+      const div = document.createElement('div');
+      div.className = 'colmap-item';
+      const defaultVal = (() => {
+        if (autoMap[i] === 'ts') return 'ts';
+        if (autoMap[i] === 'cons') return 'cons';
+        if (autoMap[i] === 'inj') return 'inj';
+        if (autoMap[i] === 'pv') return 'pv';
+        if (autoMap[i] === 'price') return 'price';
+        return '';
+      })();
+      div.innerHTML = `
+        <div class="colmap-name" title="${h}">Col ${i+1}: ${h}</div>
+        <select data-col="${i}" style="width:100%;font-size:.72rem;padding:4px 6px">
+          <option value="">— Ignorer —</option>
+          <option value="ts" ${defaultVal==='ts'?'selected':''}>🕐 Timestamp</option>
+          <option value="cons" ${defaultVal==='cons'?'selected':''}>⚡ Consommation</option>
+          <option value="pv" ${defaultVal==='pv'?'selected':''}>☀️ Production PV</option>
+          <option value="inj" ${defaultVal==='inj'?'selected':''}>↗️ Injection réseau</option>
+          <option value="price" ${defaultVal==='price'?'selected':''}>💶 Prix Spot €/MWh</option>
+        </select>`;
+      mapGrid.appendChild(div);
+    });
+
+    // Preview
+    const previewDiv = el('data-preview');
+    const sampleLines = lines.slice(1, 6);
+    let previewHTML = '<table><thead><tr>' + headers.map(h=>`<th>${h}</th>`).join('') + '</tr></thead><tbody>';
+    sampleLines.forEach(l => {
+      const cells = l.split(sep);
+      previewHTML += '<tr>' + cells.map(c=>`<td>${c}</td>`).join('') + '</tr>';
+    });
+    previewHTML += '</tbody></table>';
+    previewDiv.innerHTML = previewHTML;
+
+    el('colmap-card').classList.add('visible');
+    el('colmap-card').style.display = 'block';
+    el('parse-fill').style.width = '100%';
+    el('parse-label').textContent = `✓ ${lines.length-1} lignes analysées. Vérifiez la correspondance des colonnes.`;
+
+    // Store raw for later
+    S._rawLines = lines;
+    S._rawSep = sep;
+    S._rawHeaders = headers;
+    el('badge-data').textContent = fmt(lines.length-1, 0) + ' pts';
+  }, 50);
+}
+
+function confirmMapping() {
+  const selects = el('colmap-grid').querySelectorAll('select');
+  const map = {};
+  selects.forEach(s => { if (s.value) map[s.value] = +s.dataset.col; });
+
+  if (!map.ts && !map.cons) { alert('Veuillez au minimum mapper Timestamp et Consommation.'); return; }
+
+  const sep = S._rawSep;
+  const lines = S._rawLines;
+  const slots = [];
+
+  for (let i = 1; i < lines.length; i++) {
+    const cells = lines[i].split(sep).map(c => c.trim().replace(/['"]/g,''));
+    const tsStr = map.ts !== undefined ? cells[map.ts] : null;
+    const dt = tsStr ? parseDateTime(tsStr) : null;
+    const cons = parseFloat((cells[map.cons]||'').replace(',','.')) || 0;
+    const pv   = map.pv !== undefined ? parseFloat((cells[map.pv]||'').replace(',','.')) || 0 : 0;
+    const inj  = map.inj !== undefined ? parseFloat((cells[map.inj]||'').replace(',','.')) || 0 : 0;
+    const price = map.price !== undefined ? parseFloat((cells[map.price]||'').replace(',','.')) || null : null;
+
+    slots.push({ ts: dt, cons, pv, inj, price });
+  }
+
+  // Detect unit: kWh/15min vs kW (if values are very small, likely kWh → convert to kW)
+  const avgCons = slots.reduce((a,b)=>a+b.cons,0)/slots.length;
+  const unitFactor = avgCons < 5 ? 4 : 1; // if avg < 5 kWh/15min, assume kWh → ×4 for kW
+  if (unitFactor === 4) {
+    slots.forEach(s => { s.cons *= 4; s.pv *= 4; s.inj *= 4; });
+  }
+
+  S.rawSlots = slots;
+  S.colMap = map;
+
+  // Stats
+  const totalCons = slots.reduce((a,b)=>a+b.cons,0) * 0.25; // kWh
+  const totalPV   = slots.reduce((a,b)=>a+b.pv,0) * 0.25;
+  const maxPeak   = Math.max(...slots.map(s=>s.cons));
+  const hasPrice  = slots.some(s=>s.price!==null);
+
+  el('data-stats').innerHTML = `
+    <div class="chip"><div class="chip-l">Nb quarts d'heure</div><div class="chip-v">${fmt(slots.length)}</div></div>
+    <div class="chip"><div class="chip-l">Conso totale</div><div class="chip-v">${fmt(totalCons/1000,1)} MWh</div></div>
+    <div class="chip"><div class="chip-l">Production PV</div><div class="chip-v">${fmt(totalPV/1000,1)} MWh</div></div>
+    <div class="chip"><div class="chip-l">Pic max</div><div class="chip-v">${fmt(maxPeak,0)} kW</div></div>
+    <div class="chip"><div class="chip-l">Prix spot</div><div class="chip-v">${hasPrice?'✓ Disponible':'Non fourni'}</div></div>
+    <div class="chip"><div class="chip-l">Unité détectée</div><div class="chip-v">${unitFactor===4?'kWh/15min':'kW'}</div></div>
+  `;
+
+  alert(`✓ ${slots.length} quarts d'heure importés. Passez à l'onglet "Batterie & Site" pour configurer la simulation.`);
+}
+
+function clearData() {
+  el('paste-data').value = '';
+  el('colmap-card').style.display = 'none';
+  S.rawSlots = null;
+  el('badge-data').textContent = '—';
+}
+
+// ═══════════════════════════════════════════════════════════
+// SAMPLE DATA GENERATOR
+// ═══════════════════════════════════════════════════════════
+function loadSampleData() {
+  // Generate 1 week of synthetic 15-min data
+  const lines = ['Timestamp;Consommation [kW];Production PV [kW]'];
+  const start = new Date(2023, 0, 1, 0, 0);
+  for (let i = 0; i < 35040; i++) {
+    const d = new Date(start.getTime() + i * 15 * 60000);
+    const h = d.getHours() + d.getMinutes()/60;
+    const dow = d.getDay();
+    const month = d.getMonth();
+    // Consumption: industrial profile
+    const base = dow === 0 || dow === 6 ? 60 : 120;
+    const shift = dow > 0 && dow < 6 ? (h > 6 && h < 22 ? 80 + 40*Math.sin((h-7)/15*Math.PI) : 20) : 30;
+    const cons = base + shift + (Math.random()-0.5)*20;
+    // PV: seasonal + daily
+    const sunH = h - 4.5;
+    const dayLen = 8 + 4*Math.sin((month-2)/6*Math.PI);
+    const pvBase = sunH > 0 && sunH < dayLen ? Math.sin(sunH/dayLen*Math.PI) * (50 + 20*Math.sin((month-2)/6*Math.PI)) : 0;
+    const pv = Math.max(0, pvBase + (Math.random()-0.5)*5);
+    const dd = String(d.getDate()).padStart(2,'0');
+    const mm = String(d.getMonth()+1).padStart(2,'0');
+    const hh = String(d.getHours()).padStart(2,'0');
+    const mi = String(d.getMinutes()).padStart(2,'0');
+    lines.push(`${dd}/${mm}/${d.getFullYear()} ${hh}:${mi};${cons.toFixed(2)};${pv.toFixed(2)}`);
+    if (lines.length > 3000) break; // limit for demo
+  }
+  el('paste-data').value = lines.slice(0, 1000).join('\n');
+  alert('Données exemple chargées (1000 points). Cliquez "Analyser" pour continuer.');
+}
+
+// ═══════════════════════════════════════════════════════════
+// HELPERS
+// ═══════════════════════════════════════════════════════════
+function pmt(r, n, pv) { return r===0 ? pv/n : pv*r*Math.pow(1+r,n)/(Math.pow(1+r,n)-1); }
+function irr(equity, cfs) {
+  const f = r => { let s=-equity; cfs.forEach((c,i)=>s+=c/Math.pow(1+r,i+1)); return s; };
+  if (f(50) <= 0) return null;
+  let lo=-0.99, hi=50;
+  for(let i=0;i<300;i++){const m=(lo+hi)/2; f(m)>0?hi=m:lo=m; if(hi-lo<1e-8)break;}
+  return (lo+hi)/2;
+}
+function isHP(h, dow) {
+  const hpS = parseInt(el('hp-start').value)||7;
+  const hpE = parseInt(el('hp-end').value)||22;
+  return h >= hpS && h < hpE && dow > 0 && dow < 6;
+}
+
+// ═══════════════════════════════════════════════════════════
+// SIMULATION ENGINE
+// ═══════════════════════════════════════════════════════════
+function runDispatch(slots, battCfg, siteCfg, scenKey) {
+  const { cap, pow, effRT, socMin, socMax } = battCfg;
+  const fcrFrac  = (getScen(scenKey,'fcr-frac')||0)/100;
+  const dt = 0.25;
+  const effC = Math.sqrt(effRT);
+  const effD = Math.sqrt(effRT);
+  const dispPow = pow * (1 - fcrFrac);
+
+  // Pre-compute daily arbitrage thresholds
+  const dailyThresh = precomputeThresholds(slots, siteCfg);
+
+  let soc = cap * 0.5;
+  const res = [];
+  const peakTarget = siteCfg.gridLimit * (parseInt(el('peak-threshold-pct').value)||80) / 100;
+  const strategy = el('dispatch-strategy').value;
+
+  for (let i = 0; i < slots.length; i++) {
+    const { ts, cons, pv, price } = slots[i];
+    const h  = ts ? ts.getHours() + ts.getMinutes()/60 : (i%96)*0.25;
+    const dow = ts ? ts.getDay() : (Math.floor(i/96)%7)+1;
+    const hp = isHP(Math.floor(h), dow);
+    const netLoad = cons - pv; // positive = buying from grid
+
+    const maxChargePow = Math.min(dispPow, (cap*socMax - soc) / (dt*effC));
+    const maxDischPow  = Math.min(dispPow, (soc - cap*socMin) * effD / dt);
+
+    let battAC = 0; // positive = charging, negative = discharging
+
+    // --- DISPATCH LOGIC ---
+    if (strategy === 'autoconso' || strategy === 'combined') {
+      if (netLoad < 0 && maxChargePow > 0.01) {
+        // PV surplus → charge
+        battAC = Math.min(-netLoad, maxChargePow);
+      } else if (netLoad > 0 && maxDischPow > 0.01) {
+        // Has demand → discharge if peak or HP
+        if (hp || soc > cap * 0.65) {
+          battAC = -Math.min(netLoad, maxDischPow);
+        }
+      }
+    }
+
+    if ((strategy === 'peak' || strategy === 'combined') && battAC === 0) {
+      const netAfter = netLoad + battAC;
+      if (netAfter > peakTarget && maxDischPow > 0.01) {
+        battAC = -Math.min(netAfter - peakTarget, maxDischPow);
+      }
+    } else if (strategy === 'combined' && battAC !== 0) {
+      // Also apply peak shaving on top of autoconso
+      const netAfter = netLoad + battAC;
+      if (netAfter > peakTarget && maxDischPow > 0.01) {
+        const extra = Math.min(netAfter - peakTarget, maxDischPow + battAC);
+        battAC = -(Math.abs(battAC) + extra);
+      }
+    }
+
+    if ((strategy === 'arbitrage' || strategy === 'combined') && battAC === 0) {
+      const thresh = dailyThresh[Math.floor(i/96)] || { lo: Infinity, hi: -Infinity };
+      const usePrice = (price !== null && price !== undefined);
+      const p = usePrice ? price : (hp ? siteCfg.offtakeHP : siteCfg.offtakeHC);
+      if (p < thresh.lo && maxChargePow > 0.01) {
+        battAC = maxChargePow;
+      } else if (p > thresh.hi && maxDischPow > 0.01) {
+        battAC = -maxDischPow;
+      }
+    }
+
+    // Apply action
+    if (battAC > 0)      soc += battAC * dt * effC;
+    else if (battAC < 0) soc -= (-battAC) * dt / effD;
+    soc = Math.max(cap*socMin, Math.min(cap*socMax, soc));
+
+    const netGrid = netLoad + battAC;
+    res.push({ ts, cons, pv, price, h, dow, hp, netLoad, battAC, netGrid, soc });
+  }
+  return res;
+}
+
+function precomputeThresholds(slots, siteCfg) {
+  const days = Math.ceil(slots.length / 96);
+  const thresholds = [];
+  for (let d = 0; d < days; d++) {
+    const daySlots = slots.slice(d*96, (d+1)*96);
+    const prices = daySlots.map((s,i) => {
+      if (s.price !== null && s.price !== undefined) return s.price;
+      const h = s.ts ? s.ts.getHours() : i*0.25;
+      const dow = s.ts ? s.ts.getDay() : 1;
+      return isHP(h, dow) ? siteCfg.offtakeHP : siteCfg.offtakeHC;
+    }).sort((a,b)=>a-b);
+    const lo = prices[Math.floor(prices.length*0.25)] || 0;
+    const hi = prices[Math.floor(prices.length*0.75)] || Infinity;
+    thresholds.push({ lo, hi });
+  }
+  return thresholds;
+}
+
+// ═══════════════════════════════════════════════════════════
+// REVENUE CALCULATION
+// ═══════════════════════════════════════════════════════════
+function calcRevenues(baseline, simulated, siteCfg, scenKey) {
+  const dt = 0.25;
+  let autoconsoSav = 0, injChange = 0;
+
+  for (let i = 0; i < baseline.length; i++) {
+    const b = baseline[i], s = simulated[i];
+    const tariff = (b.hp ? siteCfg.offtakeHP : siteCfg.offtakeHC) / 1000; // €/kWh
+    const injTar = (b.hp ? siteCfg.injectHP : siteCfg.injectHC) / 1000;
+
+    const offtakeBefore = Math.max(0, b.netGrid) * dt;
+    const offtakeAfter  = Math.max(0, s.netGrid) * dt;
+    const injBefore     = Math.max(0, -b.netGrid) * dt;
+    const injAfter      = Math.max(0, -s.netGrid) * dt;
+
+    autoconsoSav += (offtakeBefore - offtakeAfter) * tariff;
+    injChange    += (injAfter - injBefore) * injTar; // negative if we inject less
+  }
+  autoconsoSav += injChange;
+
+  // Peak shaving
+  const mPeakBefore = monthlyPeaks(baseline, 'netGrid');
+  const mPeakAfter  = monthlyPeaks(simulated, 'netGrid');
+  let peakSav = 0;
+  for (let m = 0; m < 12; m++) {
+    const red = Math.max(0, (mPeakBefore[m]||0) - (mPeakAfter[m]||0));
+    peakSav += red * siteCfg.monthlyPeakTariff;
+  }
+  const annualPeakBefore = Math.max(...Object.values(mPeakBefore));
+  const annualPeakAfter  = Math.max(...Object.values(mPeakAfter));
+  peakSav += Math.max(0, annualPeakBefore - annualPeakAfter) * siteCfg.yearlyPeakTariff;
+
+  // Arbitrage (simulation-based if prices available, else formula)
+  let arbitrage = 0;
+  const hasPrice = simulated.some(s => s.price !== null && s.price !== undefined);
+  if (hasPrice) {
+    for (let i = 0; i < simulated.length; i++) {
+      const s = simulated[i];
+      const p = s.price || 0;
+      arbitrage += -s.battAC * p * dt / 1000; // discharge earns, charge costs
+    }
+    // Remove autoconso portion (already counted above)
+    // Simple deduction: arbitrage only for market slots
+  } else {
+    // Formula-based
+    const spread = parseFloat(el(scenKey+'-arb-spread').value)||0;
+    const cycles = parseFloat(el(scenKey+'-arb-cycles').value)||0;
+    const capKwh = parseFloat(el('batt-cap').value)||215;
+    const eff = (parseFloat(el('batt-eff').value)||92)/100;
+    arbitrage = spread/1000 * capKwh * eff * cycles * 365;
+  }
+
+  // FCR
+  const fcrFrac  = (parseFloat(el(scenKey+'-fcr-frac').value)||0)/100;
+  const fcrAvail = (parseFloat(el(scenKey+'-fcr-avail').value)||0)/100;
+  const fcrPrice = parseFloat(el(scenKey+'-fcr-price').value)||0;
+  const pow = parseFloat(el('batt-pow').value)||100;
+  const fcrRev = pow * fcrFrac * fcrPrice * 8760 * fcrAvail / 1000;
+
+  // aFRR
+  const afrFrac  = (parseFloat(el(scenKey+'-afrr-frac').value)||0)/100;
+  const afrAvail = (parseFloat(el(scenKey+'-afrr-avail').value)||0)/100;
+  const afrPrice = parseFloat(el(scenKey+'-afrr-price').value)||0;
+  const afrRev   = pow * afrFrac * afrPrice * 8760 * afrAvail / 1000;
+
+  // Imbalance
+  const capKwh = parseFloat(el('batt-cap').value)||215;
+  const imbalUnit = parseFloat(el(scenKey+'-imbal').value)||0;
+  const imbalRev = imbalUnit * capKwh;
+
+  return {
+    autoconso:   Math.max(0, autoconsoSav),
+    peakShaving: Math.max(0, peakSav),
+    arbitrage:   Math.max(0, arbitrage),
+    fcr:         fcrRev,
+    afrr:        afrRev,
+    imbalance:   imbalRev,
+    total: Math.max(0, autoconsoSav) + Math.max(0, peakSav) + Math.max(0, arbitrage) + fcrRev + afrRev + imbalRev
+  };
+}
+
+function monthlyPeaks(slots, field) {
+  const peaks = {};
+  slots.forEach(s => {
+    if (!s.ts) return;
+    const m = s.ts.getMonth();
+    const v = s[field] || 0;
+    if (v > (peaks[m]||0)) peaks[m] = v;
+  });
+  return peaks;
+}
+
+// ═══════════════════════════════════════════════════════════
+// FINANCIAL MODEL
+// ═══════════════════════════════════════════════════════════
+function calcFinancials(revenues) {
+  const capexBatt = parseFloat(el('fin-capex-batt').value)||0;
+  const capexInst = parseFloat(el('fin-capex-install').value)||0;
+  const capexRec  = parseFloat(el('fin-capex-recycle').value)||0;
+  const subsidy   = parseFloat(el('fin-capex-subsidy').value)||0;
+  const capexNet  = capexBatt + capexInst + capexRec - subsidy;
+  const opex      = parseFloat(el('fin-opex').value)||0;
+  const ems       = parseFloat(el('fin-ems').value)||0;
+  const wacc      = (parseFloat(el('fin-wacc').value)||8)/100;
+  const duration  = parseInt(el('fin-duration').value)||15;
+  const inflation = (parseFloat(el('fin-inflation').value)||1.5)/100;
+  const model     = S.finModel;
+
+  // Aggregator fees (use base scenario)
+  const fcrAgg  = (parseFloat(el('base-fcr-agg').value)||38)/100;
+  const afrAgg  = (parseFloat(el('base-afrr-agg').value)||35)/100;
+  const gridServiceRev = revenues.fcr + revenues.afrr + revenues.imbalance + revenues.arbitrage;
+  const aggFees = gridServiceRev * Math.max(fcrAgg, afrAgg); // conservative: max rate
+
+  const grossRev = revenues.total;
+  const totalDeductions = aggFees + opex + ems;
+  const netRev   = Math.max(0, grossRev - totalDeductions);
+
+  // Financing (tiers)
+  const dr       = (parseFloat(el('fin-debt-ratio').value)||70)/100;
+  const loanRate = (parseFloat(el('fin-loan-rate').value)||4.5)/100;
+  const loanYrs  = parseInt(el('fin-loan-years').value)||7;
+  const equity   = capexNet * (1 - dr);
+  const debt     = capexNet * dr;
+  const annuity  = debt > 0 ? pmt(loanRate, loanYrs, debt) : 0;
+
+  const wgiShare = (parseFloat(el('fin-wgi-share').value)||60)/100;
+
+  // Build annual cash flows
+  const cfs = [], cfsClient = [];
+  for (let y = 1; y <= duration; y++) {
+    const inflFactor = Math.pow(1 + inflation, y - 1);
+    const yr_gross = grossRev * inflFactor;
+    const yr_net   = netRev * inflFactor;
+
+    if (model === 'tiers') {
+      const wgiCF = yr_net * wgiShare - (y <= loanYrs ? annuity : 0);
+      const clientCF = yr_net * (1 - wgiShare);
+      cfs.push(wgiCF);
+      cfsClient.push(clientCF);
+    } else if (model === 'propres') {
+      const clientCF = yr_gross - aggFees * inflFactor - (opex + ems) * inflFactor;
+      cfs.push(clientCF);
+      cfsClient.push(clientCF);
+    } else if (model === 'leasing') {
+      const lease = parseFloat(el('fin-lease-annual').value)||0;
+      const wgiCF = lease - (y <= loanYrs ? annuity : 0);
+      const clientCF = yr_gross - aggFees * inflFactor - (opex + ems) * inflFactor - lease;
+      cfs.push(wgiCF);
+      cfsClient.push(clientCF);
+    }
+  }
+
+  // NPV, TRI on WGI equity (tiers) or client CAPEX (propres)
+  const investBase = model === 'tiers' ? equity : capexNet;
+  const cfTotal = cfs.reduce((a,b)=>a+b,0);
+  const cfMoy   = cfTotal / duration;
+  let npv = -investBase;
+  cfs.forEach((c,i) => npv += c/Math.pow(1+wacc,i+1));
+  const irrVal = irr(investBase, cfs);
+  const paybackGross = grossRev > 0 ? capexNet / (grossRev - aggFees - opex - ems) : null;
+
+  return {
+    capexNet, equity, debt, annuity, grossRev, totalDeductions, netRev,
+    aggFees, cfs, cfsClient, cfTotal, cfMoy, npv, irr: irrVal, paybackGross,
+    profitabilityIndex: investBase > 0 ? (npv + investBase) / investBase : 0,
+    model, duration, wgiShare, opex, ems, aggFees,
+    monthlyPeakBefore: null, monthlyPeakAfter: null
+  };
+}
+
+// ═══════════════════════════════════════════════════════════
+// MAIN SIMULATION RUNNER
+// ═══════════════════════════════════════════════════════════
+function runSimulation() {
+  if (!S.rawSlots || S.rawSlots.length < 96) {
+    alert('Importez d\'abord vos données quart-horaires (Tab 1). Minimum 96 points requis.');
+    return;
+  }
+
+  const prog = el('sim-progress');
+  prog.classList.add('visible');
+
+  const steps = [
+    [10, 'Lecture des paramètres...'],
+    [25, 'Simulation dispatch batterie...'],
+    [55, 'Calcul des revenus...'],
+    [75, 'Modèle financier (3 scénarios)...'],
+    [95, 'Génération des résultats...'],
+  ];
+
+  let step = 0;
+  function nextStep() {
+    if (step >= steps.length) {
+      el('sim-fill').style.width = '100%';
+      el('sim-label').textContent = '✓ Simulation terminée !';
+      renderResults();
+      el('badge-res').textContent = '✓ Calculé';
+      // Switch to results tab
+      document.querySelectorAll('.ntab').forEach(t => t.classList.remove('active'));
+      document.querySelectorAll('.tab-section').forEach(s => s.classList.remove('active'));
+      document.querySelector('.ntab[data-tab="t5"]').classList.add('active');
+      el('t5').classList.add('active');
+      return;
+    }
+    const [pct, label] = steps[step++];
+    el('sim-fill').style.width = pct + '%';
+    el('sim-label').textContent = label;
+    setTimeout(nextStep, 30);
+  }
+
+  setTimeout(() => {
+    const battCfg = {
+      cap:    parseFloat(el('batt-cap').value)||215,
+      pow:    parseFloat(el('batt-pow').value)||100,
+      effRT:  (parseFloat(el('batt-eff').value)||92)/100,
+      socMin: (parseFloat(el('batt-soc-min').value)||10)/100,
+      socMax: (parseFloat(el('batt-soc-max').value)||90)/100,
+    };
+    const siteCfg = {
+      gridLimit:        parseFloat(el('site-grid-limit').value)||172.5,
+      offtakeHP:        parseFloat(el('tarif-offtake-hp').value)||290,
+      offtakeHC:        parseFloat(el('tarif-offtake-hc').value)||200,
+      injectHP:         parseFloat(el('tarif-inject-hp').value)||70,
+      injectHC:         parseFloat(el('tarif-inject-hc').value)||50,
+      monthlyPeakTariff:parseFloat(el('tarif-monthly-peak').value)||6.76,
+      yearlyPeakTariff: parseFloat(el('tarif-yearly-peak').value)||40.54,
+    };
+
+    // Baseline: slots as-is (no battery dispatch changes)
+    const baseline = S.rawSlots.map(s => ({ ...s, netLoad: s.cons - s.pv, battAC: 0, netGrid: s.cons - s.pv, soc: 0, hp: isHP(s.ts ? s.ts.getHours() : 0, s.ts ? s.ts.getDay() : 1) }));
+
+    // Dispatch per scenario
+    const simCons = runDispatch(S.rawSlots, battCfg, siteCfg, 'cons');
+    const simBase = runDispatch(S.rawSlots, battCfg, siteCfg, 'base');
+    const simOpti = runDispatch(S.rawSlots, battCfg, siteCfg, 'opti');
+
+    // Revenues
+    const revCons = calcRevenues(baseline, simCons, siteCfg, 'cons');
+    const revBase = calcRevenues(baseline, simBase, siteCfg, 'base');
+    const revOpti = calcRevenues(baseline, simOpti, siteCfg, 'opti');
+
+    // Financials
+    const finBase = calcFinancials(revBase);
+    const finCons = calcFinancials(revCons);
+    const finOpti = calcFinancials(revOpti);
+
+    S.simResults = { baseline, simBase, revCons, revBase, revOpti, finBase, finCons, finOpti, battCfg, siteCfg };
+    nextStep();
+  }, 50);
+  nextStep();
+}
+
+function getScen(key, param) {
+  return el(key + '-' + param) ? parseFloat(el(key + '-' + param).value) : 0;
+}
+
+// ═══════════════════════════════════════════════════════════
+// RESULTS RENDERER
+// ═══════════════════════════════════════════════════════════
+let chartMonthly = null, chartWeekly = null;
+
+function renderResults() {
+  const { baseline, simBase, revCons, revBase, revOpti, finBase, finCons, finOpti } = S.simResults;
+
+  el('res-placeholder').classList.add('hidden');
+  el('res-content').classList.remove('hidden');
+
+  const dur = parseInt(el('fin-duration').value)||15;
+  el('res-title').textContent = 'Résultats — BESS ' + (el('batt-cap').value) + ' kWh / ' + (el('batt-pow').value) + ' kW';
+  el('res-subtitle').textContent = fmt(baseline.length) + ' quarts d\'heure simulés · Modèle : ' + ({tiers:'Tiers-investissement',propres:'Fonds propres',leasing:'Leasing'}[S.finModel]);
+
+  // KPIs
+  el('res-kpis').innerHTML = `
+    <div class="kpi blue"><div class="kl">Revenus bruts / an</div><div class="kv">${fmt(revBase.total/1000,1)} k€</div><div class="ks">Scénario Base</div></div>
+    <div class="kpi green"><div class="kl">TRI WGI</div><div class="kv">${finBase.irr!==null?fmt(finBase.irr*100,1)+'%':'n/a'}</div><div class="ks">Rentabilité interne</div></div>
+    <div class="kpi gold"><div class="kl">Payback CAPEX</div><div class="kv">${finBase.paybackGross?fmt(finBase.paybackGross,1)+' ans':'n/a'}</div><div class="ks">CAPEX ÷ revenus nets</div></div>
+    <div class="kpi teal"><div class="kl">VAN (WACC ${el('fin-wacc').value}%)</div><div class="kv">${fmt(finBase.npv/1000,1)} k€</div><div class="ks">Base · ${dur} ans</div></div>
+    <div class="kpi red"><div class="kl">CAPEX Net</div><div class="kv">${fmt(finBase.capexNet/1000,1)} k€</div><div class="ks">Investissement total WGI</div></div>
+  `;
+
+  // Baseline vs with battery
+  const totalConsBefore = baseline.reduce((a,b)=>a+Math.max(0,b.netGrid)*0.25,0)/1000;
+  const totalConsWith   = simBase.reduce((a,b)=>a+Math.max(0,b.netGrid)*0.25,0)/1000;
+  const totalInjBefore  = baseline.reduce((a,b)=>a+Math.max(0,-b.netGrid)*0.25,0)/1000;
+  const totalInjWith    = simBase.reduce((a,b)=>a+Math.max(0,-b.netGrid)*0.25,0)/1000;
+  const mPeakB = monthlyPeaks(baseline, 'netGrid');
+  const mPeakA = monthlyPeaks(simBase, 'netGrid');
+  const avgPeakB = Object.values(mPeakB).reduce((a,b)=>a+b,0)/12;
+  const avgPeakA = Object.values(mPeakA).reduce((a,b)=>a+b,0)/12;
+  const totalCons = baseline.reduce((a,b)=>a+b.cons*0.25,0)/1000;
+  const totalPV   = baseline.reduce((a,b)=>a+b.pv*0.25,0)/1000;
+  const selfConsBefore = totalPV > 0 ? (totalPV - totalInjBefore)/totalPV*100 : 0;
+  const selfConsWith   = totalPV > 0 ? (totalPV - totalInjWith)/totalPV*100 : 0;
+  const cycles = simBase.reduce((a,b)=>a+Math.max(0,-b.battAC)*0.25,0) / (parseFloat(el('batt-cap').value)||215);
+
+  el('res-baseline').innerHTML = mkStatTable([
+    ['Consommation totale', fmt(totalCons,1)+' MWh'],
+    ['Production PV totale', fmt(totalPV,1)+' MWh'],
+    ['Soutirage réseau', fmt(totalConsBefore,1)+' MWh'],
+    ['Injection réseau', fmt(totalInjBefore,1)+' MWh'],
+    ['Pic mensuel moyen', fmt(avgPeakB,0)+' kW'],
+    ['Taux autoconsommation PV', fmt(selfConsBefore,1)+' %'],
+  ]);
+  el('res-withbatt').innerHTML = mkStatTable([
+    ['Soutirage réseau', fmt(totalConsWith,1)+' MWh'],
+    ['Injection réseau', fmt(totalInjWith,1)+' MWh'],
+    ['Pic mensuel moyen', fmt(avgPeakA,0)+' kW'],
+    ['Réduction pic moyen', fmt(avgPeakB-avgPeakA,0)+' kW (-'+fmt((1-avgPeakA/avgPeakB)*100,1)+'%)'],
+    ['Autoconsommation PV', fmt(selfConsWith,1)+' %'],
+    ['Cycles batterie / an', fmt(cycles,0)+' cycles'],
+  ]);
+
+  // Revenue table
+  const total = revBase.total;
+  const rows = [
+    ['⚡ Autoconsommation', revBase.autoconso, '#16a34a'],
+    ['📉 Peak Shaving', revBase.peakShaving, '#2563eb'],
+    ['📈 Arbitrage Day-Ahead', revBase.arbitrage, '#7c3aed'],
+    ['🔄 FCR', revBase.fcr, '#0d9488'],
+    ['⚡ aFRR', revBase.afrr, '#f59e0b'],
+    ['📊 Imbalance', revBase.imbalance, '#6b7280'],
+  ];
+  let revHTML = '<thead><tr><th>Source de revenu</th><th>€/an</th><th>%</th><th style="min-width:120px">Part</th></tr></thead><tbody>';
+  rows.forEach(([label, val, color]) => {
+    const pct = total > 0 ? val/total*100 : 0;
+    revHTML += `<tr><td>${label}</td><td class="pos">${fE(val,0)}</td><td>${fmt(pct,1)} %</td><td><div class="rev-bar"><div class="rev-bar-fill" style="width:${pct}%;background:${color}"></div></div></td></tr>`;
+  });
+  const netRev = revBase.total - finBase.totalDeductions;
+  revHTML += `<tr class="total-row"><td>Total Brut</td><td>${fE(total,0)}</td><td>100 %</td><td></td></tr>`;
+  revHTML += `<tr class="deduct-row"><td>— Frais agrégateurs</td><td>-${fE(finBase.aggFees,0)}</td><td></td><td></td></tr>`;
+  revHTML += `<tr class="deduct-row"><td>— OPEX + EMS</td><td>-${fE(finBase.opex+finBase.ems,0)}</td><td></td><td></td></tr>`;
+  revHTML += `<tr class="net-row"><td>Revenus nets à partager</td><td>${fE(netRev,0)}</td><td></td><td></td></tr>`;
+  revHTML += '</tbody>';
+  el('res-rev-table').innerHTML = revHTML;
+
+  // Scenario comparison
+  function scenBlock(key, fin, rev, label, cls) {
+    const model = S.finModel;
+    const wgiShare = (parseFloat(el('fin-wgi-share').value)||60)/100;
+    const wgiNet = model === 'tiers' ? rev.total * wgiShare - fin.annuity : rev.total - fin.aggFees - fin.opex - fin.ems;
+    const clientBen = model === 'tiers' ? rev.total * (1-wgiShare) : 0;
+    return `<div class="scen-col ${cls}">
+      <div class="scen-header">${label}</div>
+      <div class="scen-row"><span class="scen-label">Revenus bruts / an</span><span class="scen-val">${fE(rev.total,0)}</span></div>
+      <div class="scen-row"><span class="scen-label">dont FCR + aFRR</span><span class="scen-val">${fE(rev.fcr+rev.afrr,0)}</span></div>
+      <div class="scen-row"><span class="scen-label">Revenus nets (après déd.)</span><span class="scen-val">${fE(rev.total-fin.totalDeductions,0)}</span></div>
+      <div class="scen-row"><span class="scen-label">Part WGI / an</span><span class="scen-val">${fE(fin.cfs[0],0)}</span></div>
+      <div class="scen-row"><span class="scen-label">Part client / an</span><span class="scen-val">${fE(fin.cfsClient[0],0)}</span></div>
+      <div class="scen-row"><span class="scen-label">TRI WGI</span><span class="scen-val">${fin.irr?fmt(fin.irr*100,1)+'%':'n/a'}</span></div>
+      <div class="scen-row"><span class="scen-label">VAN WGI</span><span class="scen-val">${fE(fin.npv,0)}</span></div>
+      <div class="scen-row"><span class="scen-label">Payback</span><span class="scen-val">${fin.paybackGross?fmt(fin.paybackGross,1)+' ans':'n/a'}</span></div>
+    </div>`;
+  }
+  el('res-scen-compare').innerHTML =
+    scenBlock('cons',finCons,revCons,'🔴 Conservateur','cons') +
+    scenBlock('base',finBase,revBase,'🔵 Base','base') +
+    scenBlock('opti',finOpti,revOpti,'🟢 Optimiste','opti');
+
+  // CF Table
+  const dur2 = finBase.duration;
+  let cfHTML = '<thead><tr><th>Année</th><th>Rev. bruts (€)</th><th>Frais (€)</th><th>Part WGI (€)</th><th>Annuité (€)</th><th>CF WGI net (€)</th><th>CF client (€)</th><th>CF cumulé WGI (€)</th></tr></thead><tbody>';
+  let cum = 0;
+  for (let y = 1; y <= dur2; y++) {
+    const loanYrs = parseInt(el('fin-loan-years').value)||7;
+    const infF = Math.pow(1+(parseFloat(el('fin-inflation').value)||1.5)/100, y-1);
+    const rev  = revBase.total * infF;
+    const fees = finBase.totalDeductions * infF;
+    const net  = rev - fees;
+    const cf   = finBase.cfs[y-1];
+    const cfc  = finBase.cfsClient[y-1];
+    const ann  = y <= loanYrs ? finBase.annuity : 0;
+    const wgiP = S.finModel === 'tiers' ? net * (parseFloat(el('fin-wgi-share').value)||60)/100 : net;
+    cum += cf;
+    cfHTML += `<tr><td>An ${y}</td><td>${fmt(rev,0)}</td><td class="neg">${fmt(fees,0)}</td><td>${fmt(wgiP,0)}</td><td class="neg">${fmt(ann,0)}</td><td class="${cf>=0?'pos':'neg'}">${fmt(cf,0)}</td><td class="${cfc>=0?'pos':'neg'}">${fmt(cfc,0)}</td><td class="${cum>=0?'pos':'neg'}">${fmt(cum,0)}</td></tr>`;
+  }
+  cfHTML += `<tfoot><tr><td>Total</td><td></td><td></td><td></td><td></td><td class="${finBase.cfTotal>=0?'pos':'neg'}">${fmt(finBase.cfTotal,0)}</td><td class="${finBase.cfsClient.reduce((a,b)=>a+b,0)>=0?'pos':'neg'}">${fmt(finBase.cfsClient.reduce((a,b)=>a+b,0),0)}</td><td></td></tr></tfoot>`;
+  el('res-cf-table').innerHTML = cfHTML;
+
+  // NPV box
+  const npvItems = [
+    {l:'CF Total non actualisé',v:fE(finBase.cfTotal,0),c:'blue'},
+    {l:'VAN (WACC '+el('fin-wacc').value+'%)',v:fE(finBase.npv,0),c:'green'},
+    {l:'Indice de profitabilité',v:fmt(finBase.profitabilityIndex,2)+'x',c:'gold'},
+    {l:'TRI (IRR)',v:finBase.irr?fmt(finBase.irr*100,1)+'%':'n/a',c:'teal'},
+    {l:'Payback CAPEX',v:finBase.paybackGross?fmt(finBase.paybackGross,1)+' ans':'n/a',c:'gold'},
+  ];
+  el('res-npv-grid').innerHTML = npvItems.map(({l,v,c})=>`<div class="npv-item" style="text-align:center"><div style="font-size:.62rem;color:var(--g400);margin-bottom:3px">${l}</div><div style="font-size:.95rem;font-weight:700;font-family:'DM Mono',monospace;color:var(--${c==='blue'?'gp':c==='green'?'green':c==='gold'?'gold':c==='teal'?'teal':'gp'})">${v}</div></div>`).join('');
+  el('res-npv-note').textContent = `Modèle ${({tiers:'Tiers-investissement',propres:'Fonds propres',leasing:'Leasing'}[S.finModel])} · VAN calculée sur fonds propres WGI (${fE(finBase.equity,0)}) · WACC ${el('fin-wacc').value}%`;
+
+  // Charts
+  renderMonthlyChart(baseline, simBase, revBase);
+  renderWeeklyChart(simBase);
+}
+
+function mkStatTable(rows) {
+  return '<div style="display:flex;flex-direction:column;gap:0">' +
+    rows.map(([l,v])=>`<div class="dr"><span class="dl">${l}</span><span class="dv">${v}</span></div>`).join('') +
+    '</div>';
+}
+
+function renderMonthlyChart(baseline, simBase, rev) {
+  const ctx = el('chart-monthly-rev').getContext('2d');
+  if (chartMonthly) chartMonthly.destroy();
+
+  // Monthly revenues (simplified: distribute annual by weight of each month's contribution)
+  const months = ['Jan','Fév','Mar','Avr','Mai','Jun','Jul','Aoû','Sep','Oct','Nov','Déc'];
+  const monthlyData = Array.from({length:12}, (_,m) => {
+    const mSlots = simBase.filter(s => s.ts && s.ts.getMonth()===m);
+    const baseMSlots = baseline.filter(s => s.ts && s.ts.getMonth()===m);
+    if (!mSlots.length) return {ac:0,peak:0,arb:0,fcr:0};
+    const frac = mSlots.length / simBase.length;
+    return {
+      ac:   rev.autoconso * frac,
+      peak: rev.peakShaving * frac,
+      arb:  rev.arbitrage * frac,
+      fcr:  (rev.fcr + rev.afrr) * frac,
+      imb:  rev.imbalance * frac,
+    };
+  });
+
+  chartMonthly = new Chart(ctx, {
+    type:'bar',
+    data:{
+      labels: months,
+      datasets:[
+        {label:'Autoconsommation',data:monthlyData.map(d=>d.ac),backgroundColor:'rgba(22,163,74,.7)',stack:'s'},
+        {label:'Peak Shaving',data:monthlyData.map(d=>d.peak),backgroundColor:'rgba(37,99,235,.7)',stack:'s'},
+        {label:'Arbitrage',data:monthlyData.map(d=>d.arb),backgroundColor:'rgba(124,58,237,.7)',stack:'s'},
+        {label:'FCR + aFRR',data:monthlyData.map(d=>d.fcr),backgroundColor:'rgba(13,148,136,.7)',stack:'s'},
+        {label:'Imbalance',data:monthlyData.map(d=>d.imb),backgroundColor:'rgba(245,158,11,.7)',stack:'s'},
+      ]
+    },
+    options:{
+      responsive:true,maintainAspectRatio:false,
+      interaction:{mode:'index',intersect:false},
+      plugins:{legend:{position:'top',labels:{font:{family:'Outfit',size:9},boxWidth:9,padding:7}},
+        tooltip:{callbacks:{label:c=>` ${c.dataset.label}: ${fmt(c.raw,0)} €`}}},
+      scales:{
+        x:{stacked:true,ticks:{font:{family:'DM Mono',size:9}},grid:{display:false}},
+        y:{stacked:true,ticks:{font:{family:'DM Mono',size:9},callback:v=>fmt(v,0)},title:{display:true,text:'€/mois',font:{size:9}}}
+      }
+    }
+  });
+}
+
+function renderWeeklyChart(sim) {
+  const ctx = el('chart-weekly').getContext('2d');
+  if (chartWeekly) chartWeekly.destroy();
+
+  // Find a representative week (mid-year, week 26)
+  const target = sim.filter(s => s.ts && s.ts.getMonth() === 5).slice(0, 96*7);
+  if (target.length < 96) {
+    el('chart-weekly').getContext('2d').fillText('Données insuffisantes', 50, 100);
+    return;
+  }
+  const labels = target.map((_,i) => {
+    const h = (i%96)*0.25;
+    const d = Math.floor(i/96);
+    return d===0&&h===0?'Lun 0h':(h===0?['Mar','Mer','Jeu','Ven','Sam','Dim'][d-1]||'':h===12?`${d*24+12}h`:'');
+  });
+
+  chartWeekly = new Chart(ctx, {
+    type:'line',
+    data:{
+      labels:target.map((_,i)=>i),
+      datasets:[
+        {label:'Consommation (kW)',data:target.map(s=>s.cons),borderColor:'rgba(37,99,235,.7)',borderWidth:1.5,pointRadius:0,fill:false,yAxisID:'y'},
+        {label:'Net réseau (kW)',data:target.map(s=>s.netGrid),borderColor:'rgba(22,163,74,.7)',borderWidth:1,pointRadius:0,fill:false,yAxisID:'y'},
+        {label:'Batterie (kW)',data:target.map(s=>s.battAC),borderColor:'rgba(245,158,11,.9)',borderWidth:1.5,pointRadius:0,fill:true,backgroundColor:'rgba(245,158,11,.1)',yAxisID:'y'},
+        {label:'SoC (%)',data:target.map(s=>(s.soc/(parseFloat(el('batt-cap').value)||215)*100)),borderColor:'rgba(124,58,237,.6)',borderWidth:1,pointRadius:0,fill:false,yAxisID:'y2'},
+      ]
+    },
+    options:{
+      responsive:true,maintainAspectRatio:false,
+      interaction:{mode:'index',intersect:false},
+      plugins:{legend:{position:'top',labels:{font:{family:'Outfit',size:9},boxWidth:9,padding:7}},
+        tooltip:{enabled:false}},
+      scales:{
+        x:{display:false},
+        y:{ticks:{font:{family:'DM Mono',size:8},callback:v=>fmt(v,0)},title:{display:true,text:'kW',font:{size:9}}},
+        y2:{position:'right',min:0,max:100,ticks:{font:{family:'DM Mono',size:8},callback:v=>v+'%'},grid:{drawOnChartArea:false}}
+      }
+    }
+  });
+}
+
+// Export
+function exportResults() {
+  if (!S.simResults) return;
+  const { revCons, revBase, revOpti, finBase } = S.simResults;
+  const lines = [
+    'Résultats BESS WGI',
+    '',
+    'Scénario,Revenus bruts (€/an),FCR+aFRR (€/an),Peak shaving (€/an),Autoconsommation (€/an),Revenus nets (€/an)',
+    `Conservateur,${fmt(revCons.total,0)},${fmt(revCons.fcr+revCons.afrr,0)},${fmt(revCons.peakShaving,0)},${fmt(revCons.autoconso,0)},${fmt(revCons.total-S.simResults.finCons.totalDeductions,0)}`,
+    `Base,${fmt(revBase.total,0)},${fmt(revBase.fcr+revBase.afrr,0)},${fmt(revBase.peakShaving,0)},${fmt(revBase.autoconso,0)},${fmt(revBase.total-finBase.totalDeductions,0)}`,
+    `Optimiste,${fmt(revOpti.total,0)},${fmt(revOpti.fcr+revOpti.afrr,0)},${fmt(revOpti.peakShaving,0)},${fmt(revOpti.autoconso,0)},${fmt(revOpti.total-S.simResults.finOpti.totalDeductions,0)}`,
+    '',
+    'Cash Flows annuels (scénario Base)',
+    'Année,CF WGI (€),CF Client (€)',
+    ...finBase.cfs.map((cf,i) => `${i+1},${fmt(cf,0)},${fmt(finBase.cfsClient[i],0)}`),
+    '',
+    `VAN,${fmt(finBase.npv,0)},€`,
+    `TRI,${finBase.irr?fmt(finBase.irr*100,2):'n/a'},%`,
+    `Payback,${finBase.paybackGross?fmt(finBase.paybackGross,2):'n/a'},ans`,
+  ];
+  const blob = new Blob([lines.join('\n')], {type:'text/csv;charset=utf-8;'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'WGI_BESS_results.csv';
+  a.click();
+}
+
+// Init
+updateCapexRecap();
+</script>
+</body>
+</html>
