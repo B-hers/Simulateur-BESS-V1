@@ -6,6 +6,7 @@
 <title>WGI · Simulateur BESS</title>
 <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet"/>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
 :root{
   --gd:#0d1f3c;--gp:#1a3a6b;--gm:#2563eb;--gl:#3b82f6;--gpa:#eff6ff;
@@ -14,7 +15,7 @@
   --orange:#ea580c;--orangep:#fff7ed;
   --w:#fff;--g50:#f8fafc;--g100:#f1f5f9;--g200:#e2e8f0;
   --g300:#cbd5e1;--g400:#94a3b8;--g500:#64748b;--g700:#334155;--g900:#0f172a;
-  --red:#dc2626;--teal:#0d9488;--tealp:#f0fdfa;
+  --red:#dc2626;--teal:#0d9488;--tealp:#f0fdfa;--solar:#f97316;
   --rad:12px;--rads:8px;--sh:0 4px 24px rgba(0,0,0,.07);
 }
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
@@ -43,14 +44,24 @@ header::before{content:'';position:absolute;inset:0;background:url("data:image/s
 main{max-width:1300px;margin:0 auto;padding:22px 28px}
 .tab-section{display:none}.tab-section.active{display:block}
 
+/* SUB-TABS (inside Tab 1) */
+.subtabs{display:flex;gap:4px;margin-bottom:14px;border-bottom:2px solid var(--g100);padding-bottom:0}
+.stab2{padding:9px 16px;font-size:.78rem;font-weight:600;color:var(--g500);cursor:pointer;border-bottom:3px solid transparent;margin-bottom:-2px;transition:all .15s;display:flex;align-items:center;gap:6px;white-space:nowrap}
+.stab2:hover:not(.active){color:var(--g700);border-bottom-color:var(--g200)}
+.stab2.active{color:var(--gm);border-bottom-color:var(--gm)}
+.stab2 .dot{width:7px;height:7px;border-radius:50%;background:var(--g300)}
+.stab2.active .dot,.stab2.ready .dot{background:var(--green)}
+.subpanel{display:none}.subpanel.active{display:block}
+
 /* CARDS */
-.card{background:var(--w);border-radius:var(--rad);box-shadow:var(--sh);overflow:hidden;margin-bottom:16px}
+.card{background:var(--w);border-radius:var(--rad);box-shadow:var(--sh);overflow:hidden;margin-bottom:14px}
 .card:last-child{margin-bottom:0}
-.ch{padding:12px 18px 10px;border-bottom:1px solid var(--g100);display:flex;align-items:center;gap:9px}
-.ch .ico{width:28px;height:28px;background:var(--gpa);border-radius:7px;display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0}
-.ch h2{font-size:.88rem;font-weight:600}
-.ch .sub{font-size:.72rem;color:var(--g400);margin-left:auto}
-.cb{padding:16px 18px}
+.ch{padding:11px 16px 10px;border-bottom:1px solid var(--g100);display:flex;align-items:center;gap:8px}
+.ch .ico{width:26px;height:26px;background:var(--gpa);border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0}
+.ch h2{font-size:.86rem;font-weight:600}
+.ch .sub{font-size:.7rem;color:var(--g400);margin-left:auto}
+.ch .ready-badge{background:var(--greenp);color:var(--green);border-radius:999px;padding:2px 8px;font-size:.65rem;font-weight:700;margin-left:auto}
+.cb{padding:14px 16px}
 
 /* GRID LAYOUTS */
 .g2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
@@ -72,141 +83,177 @@ select:focus{border-color:var(--gm)}
 .sec{font-size:.63rem;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--gm);padding:9px 0 4px;border-top:1px solid var(--g100);margin-top:8px}
 .sec:first-child{border-top:none;margin-top:0;padding-top:0}
 .ib{background:var(--gpa);border-left:3px solid var(--gl);border-radius:0 6px 6px 0;padding:6px 10px;font-size:.7rem;color:var(--gp);line-height:1.4}
-.ib.warn{background:var(--orangep);border-color:var(--orange);color:var(--orange)}
-.ib.ok{background:var(--greenp);border-color:var(--green);color:var(--green)}
+.ib.warn{background:var(--orangep);border-color:var(--orange);color:#9a3412}
+.ib.ok{background:var(--greenp);border-color:var(--green);color:#14532d}
+.ib.solar{background:#fff7ed;border-color:var(--solar);color:#9a3412}
+
+/* TYPE SELECTOR PILLS */
+.type-pills{display:flex;gap:5px;flex-wrap:wrap;margin-bottom:10px}
+.tpill{padding:6px 14px;border-radius:999px;border:1.5px solid var(--g200);font-size:.75rem;font-weight:500;cursor:pointer;transition:all .15s;color:var(--g500);background:#fff}
+.tpill:hover:not(.active){border-color:var(--gm);color:var(--gm)}
+.tpill.active{background:var(--gm);border-color:var(--gm);color:#fff;font-weight:600}
 
 /* DATA INPUT */
-.paste-area{width:100%;min-height:180px;border:2px dashed var(--g300);border-radius:var(--rads);padding:12px;font-family:'DM Mono',monospace;font-size:.7rem;color:var(--g700);background:var(--g50);resize:vertical;outline:none;transition:border-color .15s;line-height:1.5}
+.paste-area{width:100%;min-height:160px;border:2px dashed var(--g300);border-radius:var(--rads);padding:11px;font-family:'DM Mono',monospace;font-size:.68rem;color:var(--g700);background:var(--g50);resize:vertical;outline:none;transition:border-color .15s;line-height:1.5}
 .paste-area:focus{border-color:var(--gm);background:#fff}
 .paste-area::placeholder{color:var(--g400)}
 
 /* COLUMN MAPPING */
-.colmap{display:none}
-.colmap.visible{display:block}
-.colmap-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:8px;margin-top:8px}
-.colmap-item{background:var(--g50);border:1px solid var(--g200);border-radius:7px;padding:8px 10px}
-.colmap-name{font-size:.65rem;font-weight:700;color:var(--g400);margin-bottom:4px;text-overflow:ellipsis;overflow:hidden;white-space:nowrap}
-.data-preview{overflow-x:auto;margin-top:10px}
-.data-preview table{width:100%;border-collapse:collapse;font-size:.68rem;font-family:'DM Mono',monospace}
-.data-preview th{background:var(--gp);color:#fff;padding:4px 7px;text-align:left;white-space:nowrap;font-size:.64rem}
-.data-preview td{padding:3px 7px;border-bottom:1px solid var(--g100);white-space:nowrap}
-.data-preview tr:nth-child(even) td{background:var(--g50)}
+.colmap-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:7px;margin-top:8px}
+.colmap-item{background:var(--g50);border:1px solid var(--g200);border-radius:7px;padding:7px 9px}
+.colmap-name{font-size:.63rem;font-weight:700;color:var(--g400);margin-bottom:3px;text-overflow:ellipsis;overflow:hidden;white-space:nowrap}
+.data-preview{overflow-x:auto;margin-top:8px}
+.data-preview table{width:100%;border-collapse:collapse;font-size:.65rem;font-family:'DM Mono',monospace}
+.data-preview th{background:var(--gp);color:#fff;padding:3px 6px;white-space:nowrap;font-size:.61rem}
+.data-preview td{padding:2px 6px;border-bottom:1px solid var(--g100);white-space:nowrap}
 
 /* STAT CHIPS */
-.stat-chips{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
-.chip{background:var(--gpa);border-radius:8px;padding:6px 12px;display:flex;flex-direction:column;gap:2px}
-.chip-l{font-size:.62rem;font-weight:600;text-transform:uppercase;color:var(--g500);letter-spacing:.03em}
-.chip-v{font-size:.9rem;font-weight:700;color:var(--gp);font-family:'DM Mono',monospace}
+.chips{display:flex;gap:7px;flex-wrap:wrap;margin-top:8px}
+.chip{background:var(--gpa);border-radius:7px;padding:5px 11px}
+.chip.green{background:var(--greenp)}
+.chip.orange{background:#fff7ed}
+.chip-l{font-size:.6rem;font-weight:600;text-transform:uppercase;color:var(--g500);letter-spacing:.03em}
+.chip-v{font-size:.86rem;font-weight:700;color:var(--gp);font-family:'DM Mono',monospace}
+.chip.green .chip-v{color:var(--green)}
+.chip.orange .chip-v{color:var(--solar)}
+
+/* PV MAP / CITY SELECTOR */
+.city-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:6px;margin:8px 0}
+.city-btn{padding:7px 10px;border-radius:8px;border:1.5px solid var(--g200);background:#fff;cursor:pointer;font-family:'Outfit',sans-serif;font-size:.75rem;font-weight:500;color:var(--g700);transition:all .15s;text-align:left}
+.city-btn:hover:not(.active){border-color:var(--solar);color:var(--solar)}
+.city-btn.active{background:#fff7ed;border-color:var(--solar);color:#9a3412;font-weight:700}
+.city-btn .city-ghi{display:block;font-size:.62rem;color:var(--g400);margin-top:1px;font-family:'DM Mono',monospace}
+.city-btn.active .city-ghi{color:#9a3412}
+
+.orient-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:5px;margin:6px 0}
+.orient-btn{padding:6px 4px;border-radius:6px;border:1.5px solid var(--g200);background:#fff;cursor:pointer;font-size:.72rem;font-weight:500;color:var(--g700);text-align:center;transition:all .15s}
+.orient-btn:hover:not(.active){border-color:var(--solar)}
+.orient-btn.active{background:#fff7ed;border-color:var(--solar);color:#9a3412;font-weight:700}
+
+.pv-preview-chart{position:relative;height:130px;margin-top:10px}
 
 /* SCENARIO TABS */
 .scen-tabs{display:flex;gap:4px;margin-bottom:12px}
-.stab{padding:5px 14px;border-radius:999px;border:1.5px solid var(--g200);font-size:.75rem;font-weight:500;cursor:pointer;transition:all .15s;color:var(--g500);background:#fff}
-.stab:hover:not(.active){border-color:var(--gm);color:var(--gm)}
-.stab.active.cons{background:#dc2626;border-color:#dc2626;color:#fff}
-.stab.active.base{background:var(--gm);border-color:var(--gm);color:#fff}
-.stab.active.opti{background:var(--green);border-color:var(--green);color:#fff}
+.scen-pill{padding:5px 14px;border-radius:999px;border:1.5px solid var(--g200);font-size:.75rem;font-weight:500;cursor:pointer;transition:all .15s;color:var(--g500);background:#fff}
+.scen-pill.active.cons{background:#dc2626;border-color:#dc2626;color:#fff}
+.scen-pill.active.base{background:var(--gm);border-color:var(--gm);color:#fff}
+.scen-pill.active.opti{background:var(--green);border-color:var(--green);color:#fff}
 .scen-panel{display:none}.scen-panel.active{display:block}
 
 /* FCR HISTORY TABLE */
-.fcr-hist{width:100%;border-collapse:collapse;font-size:.72rem;margin-top:6px}
-.fcr-hist th{background:var(--g100);padding:4px 8px;text-align:center;color:var(--g700);font-weight:600;font-size:.65rem}
-.fcr-hist td{padding:4px 8px;text-align:center;border:1px solid var(--g100);font-family:'DM Mono',monospace}
+.fcr-hist{width:100%;border-collapse:collapse;font-size:.7rem;margin-top:5px}
+.fcr-hist th{background:var(--g100);padding:4px 7px;text-align:center;color:var(--g700);font-weight:600;font-size:.63rem}
+.fcr-hist td{padding:3px 7px;text-align:center;border:1px solid var(--g100);font-family:'DM Mono',monospace}
 .fcr-hist tr.fcr-active td{background:var(--gpa);font-weight:700;color:var(--gp)}
 
 /* BUTTONS */
-.btn{display:inline-flex;align-items:center;gap:6px;padding:9px 18px;border-radius:8px;border:none;cursor:pointer;font-family:'Outfit',sans-serif;font-size:.82rem;font-weight:600;transition:all .15s}
+.btn{display:inline-flex;align-items:center;gap:6px;padding:8px 16px;border-radius:8px;border:none;cursor:pointer;font-family:'Outfit',sans-serif;font-size:.8rem;font-weight:600;transition:all .15s}
 .btn-primary{background:var(--gm);color:#fff}
 .btn-primary:hover{background:var(--gp)}
 .btn-secondary{background:var(--g100);color:var(--g700);border:1px solid var(--g200)}
 .btn-secondary:hover{background:var(--g200)}
 .btn-green{background:var(--green);color:#fff}
 .btn-green:hover{background:#15803d}
-.btn-gold{background:var(--gold);color:#fff}
-.btn-gold:hover{background:#d97706}
-.btn-lg{padding:11px 24px;font-size:.9rem}
+.btn-solar{background:var(--solar);color:#fff}
+.btn-solar:hover{background:#ea580c}
+.btn-lg{padding:10px 22px;font-size:.88rem}
 
 /* PROGRESS */
-.progress-wrap{display:none;margin-top:12px}
-.progress-wrap.visible{display:block}
-.prog-bar{height:8px;background:var(--g200);border-radius:4px;overflow:hidden}
-.prog-fill{height:100%;background:var(--gm);border-radius:4px;transition:width .3s}
-.prog-label{font-size:.72rem;color:var(--g500);margin-top:4px}
+.prog-wrap{display:none;margin-top:10px}
+.prog-wrap.visible{display:block}
+.prog-bar{height:7px;background:var(--g200);border-radius:4px;overflow:hidden}
+.prog-fill{height:100%;background:var(--gm);border-radius:4px;transition:width .25s}
+.prog-lbl{font-size:.7rem;color:var(--g500);margin-top:3px}
 
 /* MODEL SELECTOR */
 .model-sel{display:flex;gap:8px;flex-wrap:wrap}
-.msb{flex:1;min-width:140px;padding:12px 14px;border-radius:10px;border:2px solid var(--g200);background:#fff;cursor:pointer;text-align:left;font-family:'Outfit',sans-serif;transition:all .15s}
+.msb{flex:1;min-width:130px;padding:11px 13px;border-radius:10px;border:2px solid var(--g200);background:#fff;cursor:pointer;text-align:left;font-family:'Outfit',sans-serif;transition:all .15s}
 .msb:hover:not(.active){border-color:var(--gm)}
 .msb.active{border-color:var(--gm);background:var(--gpa)}
-.msb-icon{font-size:1.3rem;margin-bottom:4px}
-.msb-title{font-size:.82rem;font-weight:700;color:var(--g900)}
-.msb-sub{font-size:.68rem;color:var(--g500);margin-top:2px}
+.msb-icon{font-size:1.2rem;margin-bottom:3px}
+.msb-title{font-size:.8rem;font-weight:700;color:var(--g900)}
+.msb-sub{font-size:.66rem;color:var(--g500);margin-top:2px}
 
 /* RESULTS */
-.res-header{background:linear-gradient(135deg,var(--gd),var(--gp));border-radius:var(--rad);padding:16px 20px;color:#fff;margin-bottom:16px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px}
-.res-title{font-size:1rem;font-weight:700}
-.res-sub{font-size:.72rem;opacity:.7;margin-top:2px}
+.res-header{background:linear-gradient(135deg,var(--gd),var(--gp));border-radius:var(--rad);padding:14px 18px;color:#fff;margin-bottom:14px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px}
+.res-title{font-size:.96rem;font-weight:700}
+.res-sub{font-size:.7rem;opacity:.7;margin-top:2px}
 
 /* KPI GRID */
-.kg{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-bottom:16px}
+.kg{display:grid;grid-template-columns:repeat(5,1fr);gap:9px;margin-bottom:14px}
 @media(max-width:900px){.kg{grid-template-columns:repeat(3,1fr)}}
-.kpi{background:var(--w);border-radius:10px;box-shadow:var(--sh);padding:11px 13px}
+.kpi{background:var(--w);border-radius:10px;box-shadow:var(--sh);padding:10px 12px}
 .kpi.blue{background:var(--gpa)}.kpi.green{background:var(--greenp)}.kpi.gold{background:var(--goldp)}.kpi.teal{background:var(--tealp)}.kpi.red{background:#fee2e2}
-.kl{font-size:.61rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--g400);margin-bottom:3px}
+.kl{font-size:.59rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--g400);margin-bottom:2px}
 .kpi.blue .kl{color:#1d4ed8}.kpi.green .kl{color:var(--green)}.kpi.gold .kl{color:#b45309}.kpi.teal .kl{color:var(--teal)}.kpi.red .kl{color:var(--red)}
-.kv{font-size:1.35rem;font-weight:700;letter-spacing:-.03em;line-height:1}
+.kv{font-size:1.3rem;font-weight:700;letter-spacing:-.03em;line-height:1}
 .kpi.blue .kv{color:var(--gp)}.kpi.green .kv{color:var(--green)}.kpi.gold .kv{color:#b45309}.kpi.teal .kv{color:var(--teal)}.kpi.red .kv{color:var(--red)}
-.ks{font-size:.62rem;color:var(--g400);margin-top:2px}
+.ks{font-size:.6rem;color:var(--g400);margin-top:2px}
 
 /* REVENUE TABLE */
-.rev-table{width:100%;border-collapse:collapse;font-size:.78rem}
-.rev-table th{padding:7px 10px;text-align:right;color:var(--g500);font-weight:600;font-size:.66rem;text-transform:uppercase;letter-spacing:.03em;border-bottom:2px solid var(--g100)}
+.rev-table{width:100%;border-collapse:collapse;font-size:.76rem}
+.rev-table th{padding:6px 9px;text-align:right;color:var(--g500);font-weight:600;font-size:.64rem;text-transform:uppercase;letter-spacing:.03em;border-bottom:2px solid var(--g100)}
 .rev-table th:first-child{text-align:left}
-.rev-table td{padding:7px 10px;text-align:right;border-bottom:1px solid var(--g50)}
+.rev-table td{padding:6px 9px;text-align:right;border-bottom:1px solid var(--g50)}
 .rev-table td:first-child{text-align:left;font-weight:500}
 .rev-table tr:hover td{background:var(--g50)}
 .rev-table .total-row td{font-weight:700;background:var(--g100);border-top:2px solid var(--g200)}
 .rev-table .deduct-row td{color:var(--red)}
 .rev-table .net-row td{background:var(--gpa);color:var(--gp);font-weight:700}
-.rev-bar{display:flex;align-items:center;gap:6px}
-.rev-bar-fill{height:8px;border-radius:4px;min-width:2px;transition:width .3s}
-.pos{color:var(--green)}.neg{color:var(--red)}
+.rev-bar-wrap{display:flex;align-items:center}
+.rev-bar-fill{height:7px;border-radius:4px;min-width:2px}
 
 /* SCENARIO COMPARISON */
-.scen-compare{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
-.scen-col{border-radius:10px;overflow:hidden;border:2px solid var(--g200)}
+.scen-compare{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.scen-col{border-radius:9px;overflow:hidden;border:2px solid var(--g200)}
 .scen-col.base{border-color:var(--gm)}
-.scen-header{padding:10px 14px;font-weight:700;font-size:.82rem;text-align:center}
-.scen-col.cons .scen-header{background:#fee2e2;color:var(--red)}
-.scen-col.base .scen-header{background:var(--gpa);color:var(--gp)}
-.scen-col.opti .scen-header{background:var(--greenp);color:var(--green)}
-.scen-row{display:flex;justify-content:space-between;padding:6px 14px;border-bottom:1px solid var(--g100);font-size:.76rem}
+.scen-hdr{padding:9px 12px;font-weight:700;font-size:.8rem;text-align:center}
+.scen-col.cons .scen-hdr{background:#fee2e2;color:var(--red)}
+.scen-col.base .scen-hdr{background:var(--gpa);color:var(--gp)}
+.scen-col.opti .scen-hdr{background:var(--greenp);color:var(--green)}
+.scen-row{display:flex;justify-content:space-between;padding:5px 12px;border-bottom:1px solid var(--g100);font-size:.74rem}
 .scen-row:last-child{border-bottom:none}
-.scen-label{color:var(--g500)}
+.scen-lbl{color:var(--g500)}
 .scen-val{font-weight:600;font-family:'DM Mono',monospace}
 
 /* CF TABLE */
-.cf-table{width:100%;border-collapse:collapse;font-size:.72rem}
-.cf-table th{padding:5px 7px;text-align:right;color:var(--g500);font-weight:600;font-size:.62rem;text-transform:uppercase;border-bottom:2px solid var(--g100);white-space:nowrap}
+.cf-table{width:100%;border-collapse:collapse;font-size:.7rem}
+.cf-table th{padding:4px 6px;text-align:right;color:var(--g500);font-weight:600;font-size:.6rem;text-transform:uppercase;border-bottom:2px solid var(--g100);white-space:nowrap}
 .cf-table th:first-child{text-align:left}
-.cf-table td{padding:4px 7px;text-align:right;border-bottom:1px solid var(--g50);font-family:'DM Mono',monospace;font-size:.68rem}
-.cf-table td:first-child{font-family:'Outfit',sans-serif;font-weight:500;color:var(--g700);font-size:.7rem}
+.cf-table td{padding:3px 6px;text-align:right;border-bottom:1px solid var(--g50);font-family:'DM Mono',monospace;font-size:.66rem}
+.cf-table td:first-child{font-family:'Outfit',sans-serif;font-weight:500;color:var(--g700);font-size:.68rem}
 .cf-table tr:hover td{background:var(--g50)}
 .cf-table tfoot td{font-weight:700;background:var(--g100);border-top:2px solid var(--g200)}
 
-/* CHART WRAP */
-.cw{position:relative;height:260px}
-.cw-sm{position:relative;height:200px}
+.cw{position:relative;height:245px}
+.dr{display:flex;justify-content:space-between;align-items:center;padding:4px 0;border-bottom:1px solid var(--g100)}
+.dr:last-child{border-bottom:none}
+.dl{font-size:.74rem;color:var(--g500)}.dv{font-size:.76rem;font-weight:600;color:var(--g900);font-family:'DM Mono',monospace}
 
-/* TOGGLE */
-.toggle-btn{width:100%;background:var(--g50);border:none;padding:9px 16px;text-align:left;cursor:pointer;font-family:'Outfit',sans-serif;font-size:.78rem;font-weight:600;color:var(--g700);display:flex;align-items:center;justify-content:space-between;border-top:1px solid var(--g100);transition:background .15s}
+.toggle-btn{width:100%;background:var(--g50);border:none;padding:8px 14px;text-align:left;cursor:pointer;font-family:'Outfit',sans-serif;font-size:.76rem;font-weight:600;color:var(--g700);display:flex;align-items:center;justify-content:space-between;border-top:1px solid var(--g100);transition:background .15s}
 .toggle-btn:hover{background:var(--g100)}
 .toggle-btn .chev{font-size:10px;transition:transform .2s}
 .toggle-btn.open .chev{transform:rotate(180deg)}
-.toggle-body{display:none;padding:12px 16px;background:var(--g50);border-top:1px solid var(--g100)}
+.toggle-body{display:none;padding:12px 14px;background:var(--g50);border-top:1px solid var(--g100)}
 .toggle-body.open{display:block}
 
+/* FILE UPLOAD */
+.upload-zone{border:2px dashed var(--g300);border-radius:var(--rads);padding:16px;text-align:center;cursor:pointer;transition:all .2s;background:var(--g50);position:relative}
+.upload-zone:hover,.upload-zone.drag{border-color:var(--gm);background:var(--gpa)}
+.upload-zone input[type="file"]{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%}
+.upload-zone .uz-icon{font-size:1.6rem;margin-bottom:4px}
+.upload-zone .uz-text{font-size:.78rem;font-weight:600;color:var(--g700)}
+.upload-zone .uz-sub{font-size:.67rem;color:var(--g400);margin-top:2px}
+.upload-zone.loaded{border-color:var(--green);background:var(--greenp)}
+.upload-zone.loaded .uz-text{color:var(--green)}
+.input-mode-tabs{display:flex;gap:0;margin-bottom:10px;border:1.5px solid var(--g200);border-radius:var(--rads);overflow:hidden;width:fit-content}
+.imt{padding:7px 16px;font-size:.76rem;font-weight:600;cursor:pointer;color:var(--g500);background:#fff;border:none;font-family:'Outfit',sans-serif;transition:all .15s}
+.imt:hover:not(.active){background:var(--g100)}
+.imt.active{background:var(--gm);color:#fff}
+
+.pos{color:var(--green)}.neg{color:var(--red)}
 .hidden{display:none!important}
-footer{text-align:center;padding:14px;font-size:.65rem;color:var(--g400)}
+footer{text-align:center;padding:12px;font-size:.63rem;color:var(--g400)}
 </style>
 </head>
 <body>
@@ -216,7 +263,7 @@ footer{text-align:center;padding:14px;font-size:.65rem;color:var(--g400)}
       <div class="li">🔋</div>
       <div class="lt">
         <h1>We Green Invest · Simulateur BESS — Tiers-Investissement</h1>
-        <p>Modélisation revenus batterie sur profils quart-horaires réels · Usage interne WGI</p>
+        <p>Modélisation revenus batterie sur profils quart-horaires · Simulation PV par ville belge · Usage interne WGI</p>
       </div>
     </div>
     <div class="hbadge">🔒 Confidentiel</div>
@@ -225,54 +272,249 @@ footer{text-align:center;padding:14px;font-size:.65rem;color:var(--g400)}
 
 <div class="nav">
   <div class="nav-inner">
-    <div class="ntab active" data-tab="t1">📁 Données <span class="badge" id="badge-data">—</span></div>
+    <div class="ntab active" data-tab="t1">📁 Données <span class="badge" id="badge-data">0/3</span></div>
     <div class="ntab" data-tab="t2">🔋 Batterie & Site</div>
     <div class="ntab" data-tab="t3">⚡ Scénarios Revenus</div>
     <div class="ntab" data-tab="t4">💶 Financement</div>
-    <div class="ntab" data-tab="t5">📊 Résultats <span class="badge" id="badge-res">Non calculé</span></div>
+    <div class="ntab" data-tab="t5">📊 Résultats <span class="badge" id="badge-res">—</span></div>
   </div>
 </div>
 
 <main>
 
-<!-- ═══ TAB 1: DONNÉES ═══ -->
+<!-- ═══ TAB 1: DONNÉES — 3 sous-sections ═══ -->
 <div class="tab-section active" id="t1">
-  <div class="card">
-    <div class="ch"><div class="ico">📋</div><h2>Coller les données quart-horaires</h2><div class="sub">CSV, TSV ou copie directe depuis Excel</div></div>
-    <div class="cb">
-      <div class="ib" style="margin-bottom:10px">
-        Collez vos données avec les colonnes suivantes (ordre libre, headers en ligne 1) :<br/>
-        <strong>Timestamp</strong> · <strong>Consommation [kW ou kWh/15min]</strong> · <strong>Production PV [kW ou kWh]</strong> (optionnel) · <strong>Prix Spot [€/MWh]</strong> (optionnel)
+  <div class="subtabs">
+    <div class="stab2 active" data-sub="s-conso"><span class="dot"></span>📊 Consommation</div>
+    <div class="stab2" data-sub="s-prix"><span class="dot"></span>⚡ Contrat énergie & Prix</div>
+    <div class="stab2" data-sub="s-pv"><span class="dot"></span>☀️ Production PV</div>
+  </div>
+
+  <!-- ─── SUB 1: CONSOMMATION ─── -->
+  <div class="subpanel active" id="s-conso">
+    <div class="card">
+      <div class="ch"><div class="ico">📊</div><h2>Données de consommation — quarts horaires</h2><div class="sub">CSV ou copie Excel</div></div>
+      <div class="cb">
+        <div class="input-mode-tabs">
+          <button class="imt active" onclick="setInputMode('conso','paste',this)">📋 Coller</button>
+          <button class="imt" onclick="setInputMode('conso','file',this)">📂 Fichier Excel</button>
+        </div>
+
+        <!-- PASTE MODE -->
+        <div id="conso-paste-mode">
+          <div class="ib" style="margin-bottom:10px">
+            Deux formats acceptés :<br/>
+            <strong>① Format GRD belge (Fluvius / ORES / Sibelga)</strong> — copiez-collez directement depuis l'export Excel (5 lignes d'en-tête, colonnes M_A+ et M_A-). Détection automatique.<br/>
+            <strong>② Format libre</strong> — colonnes : <strong>Timestamp</strong> + <strong>Consommation [kW ou kWh/15min]</strong> + optionnel : Injection. Séparateur auto-détecté (;  ,  tab).
+          </div>
+          <textarea class="paste-area" id="paste-conso" placeholder="Format GRD belge (Fluvius/ORES/Sibelga) — coller directement depuis Excel :&#10;EAN	541449011000040739_ID2	...&#10;Role	B_A-	M_A-	B_A+	M_A+	...&#10;01/01/2024 00:15	0	0	63.2	63.2	...&#10;&#10;OU format libre :&#10;Timestamp;Consommation [kW];Injection [kW]&#10;01/01/2024 00:15;63.2;0.0"></textarea>
+          <div style="display:flex;gap:7px;margin-top:9px;flex-wrap:wrap">
+            <button class="btn btn-primary" onclick="parseConso()">🔍 Analyser</button>
+            <button class="btn btn-secondary" onclick="loadSampleConso()">📂 Données exemple</button>
+            <button class="btn btn-secondary" onclick="el('paste-conso').value='';S.conso=null;updateBadge()">🗑 Effacer</button>
+          </div>
+        </div>
+
+        <!-- FILE MODE -->
+        <div id="conso-file-mode" style="display:none">
+          <div class="ib" style="margin-bottom:10px">
+            Formats acceptés : <strong>.xlsx, .xls, .csv</strong><br/>
+            Le format GRD belge (Fluvius/ORES/Sibelga) est détecté automatiquement. Pour un fichier custom, les colonnes seront mappées après chargement.
+          </div>
+          <div class="upload-zone" id="conso-upload-zone" ondragover="handleDrag(event,this)" ondragleave="handleDragLeave(this)" ondrop="handleDrop(event,'conso')">
+            <input type="file" accept=".xlsx,.xls,.csv,.ods" onchange="handleFileUpload(event,'conso')"/>
+            <div class="uz-icon">📊</div>
+            <div class="uz-text" id="conso-upload-text">Glisser-déposer votre fichier ici</div>
+            <div class="uz-sub">ou cliquer pour parcourir · .xlsx .xls .csv</div>
+          </div>
+          <div class="ib" style="margin-top:8px;font-size:.68rem">
+            💡 Le fichier n'est pas envoyé sur internet — tout le traitement se fait dans votre navigateur.
+          </div>
+        </div>
+
+        <div class="prog-wrap" id="prog-conso"><div class="prog-bar"><div class="prog-fill" id="fill-conso" style="width:0%"></div></div><div class="prog-lbl" id="lbl-conso">—</div></div>
       </div>
-      <textarea class="paste-area" id="paste-data" placeholder="Collez vos données ici...&#10;Exemple :&#10;Timestamp;Consommation [kWh];Injection [kWh];Production PV [kWh]&#10;01/01/2023 00:15;1.250;0.000;0.000&#10;01/01/2023 00:30;1.180;0.000;0.000&#10;..."></textarea>
-      <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
-        <button class="btn btn-primary" onclick="parseData()">🔍 Analyser les données</button>
-        <button class="btn btn-secondary" onclick="loadSampleData()">📂 Charger données exemple</button>
-        <button class="btn btn-secondary" onclick="clearData()">🗑 Effacer</button>
-      </div>
-      <div class="progress-wrap" id="parse-progress">
-        <div class="prog-bar"><div class="prog-fill" id="parse-fill" style="width:0%"></div></div>
-        <div class="prog-label" id="parse-label">Analyse en cours...</div>
+    </div>
+    <div class="card hidden" id="colmap-conso-card">
+      <div class="ch"><div class="ico">🗂</div><h2>Correspondance des colonnes — Consommation</h2></div>
+      <div class="cb">
+        <div class="colmap-grid" id="colmap-conso-grid"></div>
+        <div class="data-preview" id="preview-conso"></div>
+        <div class="chips" id="stats-conso"></div>
+        <div style="margin-top:10px"><button class="btn btn-green" onclick="confirmConso()">✓ Confirmer la consommation</button></div>
+        <div class="ib" id="conso-year-note" style="margin-top:8px;display:none">
+          📅 <strong>Données multi-années détectées.</strong> La simulation utilisera l'année la plus récente complète disponible, alignée avec les données PV. Les années incomplètes sont ignorées automatiquement.
+        </div>
       </div>
     </div>
   </div>
 
-  <div class="card colmap" id="colmap-card">
-    <div class="ch"><div class="ico">🗂</div><h2>Correspondance des colonnes</h2></div>
-    <div class="cb">
-      <div class="colmap-grid" id="colmap-grid"></div>
-      <div class="data-preview" id="data-preview"></div>
-      <div class="stat-chips" id="data-stats"></div>
-      <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap">
-        <button class="btn btn-green btn-lg" onclick="confirmMapping()">✓ Confirmer & préparer simulation</button>
+  <!-- ─── SUB 2: PRIX ÉNERGIE ─── -->
+  <div class="subpanel" id="s-prix">
+    <div class="card">
+      <div class="ch"><div class="ico">⚡</div><h2>Type de contrat énergie</h2></div>
+      <div class="cb">
+        <div class="type-pills" id="prix-type-pills">
+          <button class="tpill active" data-type="tou">📋 Tarif HP/HC (contrat fixe)</button>
+          <button class="tpill" data-type="flat">🔷 Tarif fixe unique</button>
+          <button class="tpill" data-type="spot">📈 Prix spot (paste 15min ou horaire)</button>
+          <button class="tpill" data-type="index">🔗 Indexé (spot + marge fixe)</button>
+        </div>
+
+        <!-- HP/HC -->
+        <div id="prix-tou" class="prix-panel">
+          <div class="ib" style="margin-bottom:10px">Les tarifs HP/HC sont définis dans l'onglet <strong>Batterie & Site</strong>. Ils seront utilisés directement pour le calcul des revenus.</div>
+          <div class="g2">
+            <div class="f"><label>Tarif HP (Heures Pleines)</label><div class="ir"><input type="number" id="p-offtake-hp" value="290" min="0" max="1000" step="1"/><div class="iu">€/MWh</div></div></div>
+            <div class="f"><label>Tarif HC (Heures Creuses)</label><div class="ir"><input type="number" id="p-offtake-hc" value="200" min="0" max="1000" step="1"/><div class="iu">€/MWh</div></div></div>
+            <div class="f"><label>Prix injection HP</label><div class="ir"><input type="number" id="p-inject-hp" value="70" min="0" max="500" step="1"/><div class="iu">€/MWh</div></div></div>
+            <div class="f"><label>Prix injection HC</label><div class="ir"><input type="number" id="p-inject-hc" value="50" min="0" max="500" step="1"/><div class="iu">€/MWh</div></div></div>
+          </div>
+          <div class="ib ok" style="margin-top:8px">✓ Prêt à utiliser — aucune donnée de prix à coller.</div>
+        </div>
+
+        <!-- Flat -->
+        <div id="prix-flat" class="prix-panel hidden">
+          <div class="g2">
+            <div class="f"><label>Tarif offtake unique (toutes heures)</label><div class="ir"><input type="number" id="p-flat" value="240" min="0" max="1000" step="1"/><div class="iu">€/MWh</div></div></div>
+            <div class="f"><label>Prix injection unique</label><div class="ir"><input type="number" id="p-flat-inj" value="60" min="0" max="500" step="1"/><div class="iu">€/MWh</div></div></div>
+          </div>
+        </div>
+
+        <!-- Spot -->
+        <div id="prix-spot" class="prix-panel hidden">
+          <div class="ib warn" style="margin-bottom:10px">
+            Collez ou importez les prix spot EPEX Belgium. Format : <strong>Timestamp ; Prix [€/MWh]</strong>. Si horaire, interpolation automatique vers 15-min.
+          </div>
+          <div class="input-mode-tabs">
+            <button class="imt active" onclick="setInputMode('spot','paste',this)">📋 Coller</button>
+            <button class="imt" onclick="setInputMode('spot','file',this)">📂 Fichier Excel</button>
+          </div>
+          <div id="spot-paste-mode">
+            <textarea class="paste-area" id="paste-spot" placeholder="Timestamp;Prix Spot [€/MWh]&#10;01/01/2023 00:00;45.23&#10;01/01/2023 01:00;44.10&#10;..."></textarea>
+            <div style="display:flex;gap:7px;margin-top:9px;flex-wrap:wrap">
+              <button class="btn btn-primary" onclick="parseSpot()">🔍 Analyser les prix</button>
+              <button class="btn btn-secondary" onclick="loadSampleSpot()">📂 Exemple EPEX</button>
+            </div>
+          </div>
+          <div id="spot-file-mode" style="display:none">
+            <div class="upload-zone" id="spot-upload-zone" ondragover="handleDrag(event,this)" ondragleave="handleDragLeave(this)" ondrop="handleDrop(event,'spot')">
+              <input type="file" accept=".xlsx,.xls,.csv" onchange="handleFileUpload(event,'spot')"/>
+              <div class="uz-icon">⚡</div>
+              <div class="uz-text" id="spot-upload-text">Glisser-déposer votre fichier EPEX ici</div>
+              <div class="uz-sub">ou cliquer pour parcourir · .xlsx .xls .csv</div>
+            </div>
+          </div>
+          <div class="prog-wrap" id="prog-spot"><div class="prog-bar"><div class="prog-fill" id="fill-spot" style="width:0%"></div></div><div class="prog-lbl" id="lbl-spot">—</div></div>
+          <div class="chips" id="stats-spot" style="margin-top:8px"></div>
+        </div>
+
+        <!-- Indexed -->
+        <div id="prix-index" class="prix-panel hidden">
+          <div class="ib" style="margin-bottom:8px">Spot + marge fixe : utilisez les prix spot collés ci-dessus avec une marge appliquée.</div>
+          <div class="g2">
+            <div class="f"><label>Marge fixe sur spot (offtake)</label><div class="ir"><input type="number" id="p-idx-markup" value="25" min="-100" max="200" step="1"/><div class="iu">€/MWh</div></div></div>
+            <div class="f"><label>Marge fixe injection</label><div class="ir"><input type="number" id="p-idx-inj-markup" value="-20" min="-200" max="100" step="1"/><div class="iu">€/MWh</div></div></div>
+          </div>
+          <div class="ib warn" style="margin-top:8px">Nécessite les prix spot ci-dessus (onglet Spot).</div>
+        </div>
       </div>
+    </div>
+
+    <!-- Tarifs puissance -->
+    <div class="card">
+      <div class="ch"><div class="ico">📐</div><h2>Tarifs de puissance réseau</h2></div>
+      <div class="cb">
+        <div class="g2">
+          <div class="f"><label>Tarif mensuel de pointe</label><div class="ir"><input type="number" id="p-monthly-peak" value="6.76" min="0" max="50" step="0.01"/><div class="iu">€/kW/mois</div></div></div>
+          <div class="f"><label>Tarif annuel de pointe (capacité)</label><div class="ir"><input type="number" id="p-yearly-peak" value="40.54" min="0" max="200" step="0.01"/><div class="iu">€/kW/an</div></div></div>
+          <div class="f"><label>HP : début</label><div class="ir"><input type="number" id="p-hp-start" value="7" min="0" max="23" step="1"/><div class="iu">h</div></div></div>
+          <div class="f"><label>HP : fin</label><div class="ir"><input type="number" id="p-hp-end" value="22" min="0" max="23" step="1"/><div class="iu">h</div></div></div>
+        </div>
+        <div class="ib" style="margin-top:8px;font-size:.68rem">HP : lundi–vendredi de <strong id="hp-disp">7h à 22h</strong>. HC = reste du temps + weekends. Tarifs ORES/ELIA de référence par défaut.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ─── SUB 3: PRODUCTION PV ─── -->
+  <div class="subpanel" id="s-pv">
+    <div class="card">
+      <div class="ch"><div class="ico">☀️</div><h2>Source des données de production PV</h2></div>
+      <div class="cb">
+        <div class="type-pills" id="pv-mode-pills">
+          <button class="tpill active" data-pvmode="simulate">🌍 Simuler par ville belge (kWc + PR)</button>
+          <button class="tpill" data-pvmode="paste">📋 Fournir mes données mesurées</button>
+          <button class="tpill" data-pvmode="none">🚫 Pas de PV sur ce site</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- SIMULATE MODE -->
+    <div id="pv-simulate" class="pv-mode-panel">
+      <div class="card">
+        <div class="ch"><div class="ico">🏙️</div><h2>Ville & paramètres d'installation PV</h2><div class="sub" id="pv-annual-prod-badge"></div></div>
+        <div class="cb">
+          <div class="sec">Localisation</div>
+          <div class="city-grid" id="city-grid"></div>
+
+          <div class="sec">Paramètres techniques</div>
+          <div class="g3">
+            <div class="f"><label>Puissance crête</label><div class="ir"><input type="number" id="pv-kwc" value="100" min="1" max="10000" step="1"/><div class="iu">kWc</div></div></div>
+            <div class="f"><label>Ratio de performance (PR)</label><div class="ir"><input type="number" id="pv-pr" value="0.82" min="0.5" max="1.0" step="0.01"/><div class="iu">—</div></div></div>
+            <div class="f"><label>Inclinaison des panneaux</label><div class="ir"><input type="number" id="pv-tilt" value="35" min="0" max="90" step="5"/><div class="iu">degrés</div></div></div>
+          </div>
+          <div class="sec">Orientation (azimut)</div>
+          <div class="orient-grid" id="orient-grid"></div>
+          <div class="f" style="margin-top:10px"><label>Année de référence pour la simulation</label>
+            <select id="pv-year"><option value="2023" selected>2023</option><option value="2022">2022</option><option value="2024">2024</option></select>
+          </div>
+          <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap">
+            <button class="btn btn-solar btn-lg" onclick="generatePV()">☀️ Générer le profil PV annuel</button>
+          </div>
+          <div class="prog-wrap" id="prog-pv"><div class="prog-bar"><div class="prog-fill" id="fill-pv" style="width:0%"></div></div><div class="prog-lbl" id="lbl-pv">—</div></div>
+          <div class="chips" id="stats-pv" style="margin-top:8px"></div>
+          <div class="pv-preview-chart"><canvas id="chart-pv-preview"></canvas></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- PASTE MODE -->
+    <div id="pv-paste" class="pv-mode-panel hidden">
+      <div class="card">
+        <div class="ch"><div class="ico">📋</div><h2>Données PV mesurées — quarts horaires</h2></div>
+        <div class="cb">
+          <div class="ib" style="margin-bottom:10px">Colonnes : <strong>Timestamp</strong> + <strong>Production [kW ou kWh]</strong>.</div>
+          <div class="input-mode-tabs">
+            <button class="imt active" onclick="setInputMode('pv','paste',this)">📋 Coller</button>
+            <button class="imt" onclick="setInputMode('pv','file',this)">📂 Fichier Excel</button>
+          </div>
+          <div id="pv-paste-mode">
+            <textarea class="paste-area" id="paste-pv-data" placeholder="Timestamp;Production PV [kWh]&#10;01/01/2023 00:15;0.000&#10;..."></textarea>
+            <div style="margin-top:9px"><button class="btn btn-primary" onclick="parsePVData()">🔍 Analyser</button></div>
+          </div>
+          <div id="pv-file-mode" style="display:none">
+            <div class="upload-zone" id="pv-upload-zone" ondragover="handleDrag(event,this)" ondragleave="handleDragLeave(this)" ondrop="handleDrop(event,'pv')">
+              <input type="file" accept=".xlsx,.xls,.csv" onchange="handleFileUpload(event,'pv')"/>
+              <div class="uz-icon">☀️</div>
+              <div class="uz-text" id="pv-upload-text">Glisser-déposer votre fichier PV ici</div>
+              <div class="uz-sub">ou cliquer pour parcourir · .xlsx .xls .csv</div>
+            </div>
+          </div>
+          <div class="chips" id="stats-pv-paste" style="margin-top:8px"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- NO PV MODE -->
+    <div id="pv-none" class="pv-mode-panel hidden">
+      <div class="card"><div class="cb"><div class="ib ok">✓ Pas de production PV — la batterie opère uniquement en peak shaving, arbitrage et services réseau.</div></div></div>
     </div>
   </div>
 </div>
 
 <!-- ═══ TAB 2: BATTERIE & SITE ═══ -->
 <div class="tab-section" id="t2">
-  <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
     <div>
       <div class="card">
         <div class="ch"><div class="ico">🔋</div><h2>Configuration Batterie</h2></div>
@@ -285,65 +527,51 @@ footer{text-align:center;padding:14px;font-size:.65rem;color:var(--g400)}
             <div class="f"><label>SoC maximum</label><div class="ir"><input type="number" id="batt-soc-max" value="90" min="50" max="100" step="1"/><div class="iu">%</div></div></div>
             <div class="f"><label>Dégradation annuelle</label><div class="ir"><input type="number" id="batt-deg" value="2.0" min="0" max="10" step="0.1"/><div class="iu">%/an</div></div></div>
             <div class="f"><label>Durée de vie</label><div class="ir"><input type="number" id="batt-life" value="15" min="5" max="25" step="1"/><div class="iu">ans</div></div></div>
-            <div class="f"><label>Technologie</label><select id="batt-tech"><option value="lfp">LFP (Li-Ion)</option><option value="nmc">NMC (Li-Ion)</option><option value="nass">Na-Ion</option></select></div>
+            <div class="f"><label>Technologie</label><select id="batt-tech"><option value="lfp">LFP (Li-Ion)</option><option value="nmc">NMC (Li-Ion)</option></select></div>
           </div>
         </div>
       </div>
-
       <div class="card">
         <div class="ch"><div class="ico">⚡</div><h2>Stratégie de dispatch</h2></div>
         <div class="cb">
-          <div class="f"><label>Priorité principale</label>
+          <div class="f"><label>Priorité</label>
             <select id="dispatch-strategy">
               <option value="combined">Combinée (autoconso + peak + arbitrage)</option>
-              <option value="autoconso">Autoconsommation en priorité</option>
+              <option value="autoconso">Autoconsommation PV en priorité</option>
               <option value="peak">Peak shaving en priorité</option>
               <option value="arbitrage">Arbitrage en priorité</option>
             </select>
           </div>
-          <div class="f"><label>Seuil de décharge peak shaving <span class="h">(% de la pointe max historique)</span></label>
-            <div class="ir"><input type="number" id="peak-threshold-pct" value="80" min="30" max="100" step="1"/><div class="iu">%</div></div>
+          <div class="f"><label>Seuil peak shaving <span class="h">(% du pic historique max)</span></label>
+            <div class="ir"><input type="number" id="peak-thr-pct" value="80" min="30" max="100" step="1"/><div class="iu">%</div></div>
           </div>
-          <div class="ib" style="margin-top:8px">
-            En mode combiné : 1. Absorber surplus PV → 2. Peak shaving → 3. Arbitrage (prix jour/nuit ou prix spot si disponible)
-          </div>
+          <div class="f"><label>Limite raccordement réseau</label><div class="ir"><input type="number" id="site-grid-limit" value="172.5" min="10" max="5000" step="0.5"/><div class="iu">kW</div></div></div>
+          <div class="ib" style="margin-top:8px">Mode combiné : 1. Absorber surplus PV → 2. Peak shaving → 3. Arbitrage (spot si dispo, sinon TOU)</div>
         </div>
       </div>
     </div>
-
     <div>
       <div class="card">
         <div class="ch"><div class="ico">🏭</div><h2>Paramètres Site</h2></div>
         <div class="cb">
-          <div class="sec">Région & Raccordement</div>
-          <div class="g2">
-            <div class="f"><label>Région</label>
-              <select id="site-region">
-                <option value="wallonie">Wallonie</option>
-                <option value="bruxelles">Bruxelles</option>
-                <option value="flandre">Flandre</option>
-              </select>
-            </div>
-            <div class="f"><label>Limite de raccordement</label><div class="ir"><input type="number" id="site-grid-limit" value="172.5" min="10" max="5000" step="0.5"/><div class="iu">kW</div></div></div>
+          <div class="sec">Région</div>
+          <div class="f"><label>Région Belgique</label>
+            <select id="site-region"><option value="wallonie">Wallonie</option><option value="bruxelles">Bruxelles</option><option value="flandre">Flandre</option></select>
           </div>
-          <div class="sec">Tarifs Offtake / Injection</div>
-          <div class="g2">
-            <div class="f"><label>Offtake Heures Pleines</label><div class="ir"><input type="number" id="tarif-offtake-hp" value="290" min="0" max="1000" step="1"/><div class="iu">€/MWh</div></div></div>
-            <div class="f"><label>Offtake Heures Creuses</label><div class="ir"><input type="number" id="tarif-offtake-hc" value="200" min="0" max="1000" step="1"/><div class="iu">€/MWh</div></div></div>
-            <div class="f"><label>Injection HP</label><div class="ir"><input type="number" id="tarif-inject-hp" value="70" min="0" max="500" step="1"/><div class="iu">€/MWh</div></div></div>
-            <div class="f"><label>Injection HC</label><div class="ir"><input type="number" id="tarif-inject-hc" value="50" min="0" max="500" step="1"/><div class="iu">€/MWh</div></div></div>
-          </div>
-          <div class="sec">Tarifs de Puissance</div>
-          <div class="g2">
-            <div class="f"><label>Tarif mensuel de pointe</label><div class="ir"><input type="number" id="tarif-monthly-peak" value="6.76" min="0" max="50" step="0.01"/><div class="iu">€/kW/mois</div></div></div>
-            <div class="f"><label>Tarif annuel de pointe</label><div class="ir"><input type="number" id="tarif-yearly-peak" value="40.54" min="0" max="200" step="0.01"/><div class="iu">€/kW/an</div></div></div>
-          </div>
-          <div class="sec">Heures de pointe</div>
-          <div class="g2">
-            <div class="f"><label>Début HP (heure locale)</label><div class="ir"><input type="number" id="hp-start" value="7" min="0" max="23" step="1"/><div class="iu">h</div></div></div>
-            <div class="f"><label>Fin HP (heure locale)</label><div class="ir"><input type="number" id="hp-end" value="22" min="0" max="23" step="1"/><div class="iu">h</div></div></div>
-          </div>
-          <div class="ib" style="margin-top:8px;font-size:.68rem">HP : lundi–vendredi de <strong id="hp-display">7h à 22h</strong> · HC : reste du temps + weekends</div>
+          <div class="ib" style="margin-top:6px;font-size:.68rem">Les tarifs de puissance et conditions de raccordement varient selon la région. Ajustez dans l'onglet Données → Contrat énergie.</div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="ch"><div class="ico">📐</div><h2>Récapitulatif paramètres actifs</h2></div>
+        <div class="cb" id="site-recap">
+          <div class="dr"><span class="dl">Tarif offtake HP</span><span class="dv" id="sr-hp">—</span></div>
+          <div class="dr"><span class="dl">Tarif offtake HC</span><span class="dv" id="sr-hc">—</span></div>
+          <div class="dr"><span class="dl">Tarif injection HP</span><span class="dv" id="sr-inj-hp">—</span></div>
+          <div class="dr"><span class="dl">Tarif puissance mensuel</span><span class="dv" id="sr-monthly">—</span></div>
+          <div class="dr"><span class="dl">Limite raccordement</span><span class="dv" id="sr-grid">—</span></div>
+          <div class="dr"><span class="dl">Données consommation</span><span class="dv" id="sr-conso">—</span></div>
+          <div class="dr"><span class="dl">Production PV</span><span class="dv" id="sr-pv">—</span></div>
+          <div class="dr"><span class="dl">Prix énergie</span><span class="dv" id="sr-prix">—</span></div>
         </div>
       </div>
     </div>
@@ -352,184 +580,163 @@ footer{text-align:center;padding:14px;font-size:.65rem;color:var(--g400)}
 
 <!-- ═══ TAB 3: SCÉNARIOS REVENUS ═══ -->
 <div class="tab-section" id="t3">
-  <div class="card" style="margin-bottom:16px">
+  <div class="card" style="margin-bottom:14px">
     <div class="ch"><div class="ico">ℹ️</div><h2>Logique des scénarios</h2></div>
     <div class="cb">
       <div class="ib">
-        <strong>Autoconsommation & Peak shaving</strong> : calculés par simulation réelle sur vos profils quart-horaires.<br/>
-        <strong>Arbitrage Day-Ahead</strong> : calculé par simulation (prix spot si fournis) OU estimé sur base de spread jour/nuit.<br/>
-        <strong>FCR / aFRR</strong> : revenus estimés (P_réservée × prix marché × disponibilité). Les prix historiques sont affichables et modifiables par scénario.
+        <strong>Autoconsommation & Peak shaving</strong> : calculés par simulation réelle sur profils quart-horaires.<br/>
+        <strong>Arbitrage</strong> : calculé via les prix spot (si fournis) ou TOU jour/nuit.<br/>
+        <strong>FCR / aFRR / Imbalance</strong> : estimés (P_réservée × prix marché × disponibilité). Prix historiques belges modifiables par scénario — <strong>les revenus ont fluctué de 19 à 44 €/MW/h pour le FCR</strong>, ce qui explique les écarts importants entre scénarios.
       </div>
     </div>
   </div>
-
   <div class="scen-tabs">
-    <button class="stab active cons" data-scen="cons">🔴 Conservateur</button>
-    <button class="stab base" data-scen="base">🔵 Base</button>
-    <button class="stab opti" data-scen="opti">🟢 Optimiste</button>
+    <button class="scen-pill active cons" data-scen="cons">🔴 Conservateur</button>
+    <button class="scen-pill base" data-scen="base">🔵 Base</button>
+    <button class="scen-pill opti" data-scen="opti">🟢 Optimiste</button>
   </div>
 
+  <!-- Conservateur -->
   <div class="scen-panel active" id="scen-cons">
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
       <div>
         <div class="card">
-          <div class="ch"><div class="ico">🔄</div><h2>FCR — Réserve de Fréquence</h2></div>
+          <div class="ch"><div class="ico">🔄</div><h2>FCR — Conservateur <span style="font-size:.7rem;color:var(--g400);font-weight:400">(prix 2025 : 19.67 €/MW/h)</span></h2></div>
           <div class="cb">
             <div class="g2">
               <div class="f"><label>% Batterie réservé FCR</label><div class="ir"><input type="number" id="cons-fcr-frac" value="30" min="0" max="100" step="5"/><div class="iu">%</div></div></div>
               <div class="f"><label>Disponibilité</label><div class="ir"><input type="number" id="cons-fcr-avail" value="90" min="0" max="100" step="1"/><div class="iu">%</div></div></div>
               <div class="f"><label>Prix FCR retenu</label><div class="ir"><input type="number" id="cons-fcr-price" value="19.67" min="0" max="200" step="0.01"/><div class="iu">€/MW/h</div></div></div>
-              <div class="f"><label>% Commission agrégateur</label><div class="ir"><input type="number" id="cons-fcr-agg" value="38" min="0" max="60" step="1"/><div class="iu">%</div></div></div>
+              <div class="f"><label>Commission agrégateur</label><div class="ir"><input type="number" id="cons-fcr-agg" value="38" min="0" max="60" step="1"/><div class="iu">%</div></div></div>
             </div>
-            <table class="fcr-hist"><thead><tr><th>Année</th><th>Prix FCR belge (€/MW/h)</th></tr></thead>
+            <table class="fcr-hist"><thead><tr><th>Année</th><th>Prix FCR Belgique (€/MW/h)</th><th>Contexte</th></tr></thead>
             <tbody>
-              <tr><td>2021</td><td>33.00</td></tr><tr><td>2022</td><td>34.82</td></tr>
-              <tr><td>2023</td><td>26.25</td></tr><tr><td>2024</td><td>43.73</td></tr>
-              <tr class="fcr-active"><td>2025</td><td>19.67</td></tr>
+              <tr><td>2021</td><td>33.00</td><td style="font-size:.62rem;color:var(--g500)">Marché en développement</td></tr>
+              <tr><td>2022</td><td>34.82</td><td style="font-size:.62rem;color:var(--g500)">Crise énergétique</td></tr>
+              <tr><td>2023</td><td>26.25</td><td style="font-size:.62rem;color:var(--g500)">Retour à la normale</td></tr>
+              <tr><td>2024</td><td>43.73</td><td style="font-size:.62rem;color:var(--g500)">Forte volatilité</td></tr>
+              <tr class="fcr-active"><td>2025</td><td>19.67</td><td style="font-size:.62rem;color:var(--g500)">Chute — offre excédentaire</td></tr>
             </tbody></table>
           </div>
         </div>
         <div class="card">
-          <div class="ch"><div class="ico">⚡</div><h2>aFRR — Réserve de Restauration auto.</h2></div>
+          <div class="ch"><div class="ico">⚡</div><h2>aFRR — Conservateur</h2></div>
           <div class="cb">
             <div class="g2">
               <div class="f"><label>% Batterie réservé aFRR</label><div class="ir"><input type="number" id="cons-afrr-frac" value="0" min="0" max="100" step="5"/><div class="iu">%</div></div></div>
               <div class="f"><label>Disponibilité</label><div class="ir"><input type="number" id="cons-afrr-avail" value="85" min="0" max="100" step="1"/><div class="iu">%</div></div></div>
-              <div class="f"><label>Prix aFRR retenu</label><div class="ir"><input type="number" id="cons-afrr-price" value="8" min="0" max="200" step="0.1"/><div class="iu">€/MW/h</div></div></div>
-              <div class="f"><label>% Commission agrégateur</label><div class="ir"><input type="number" id="cons-afrr-agg" value="38" min="0" max="60" step="1"/><div class="iu">%</div></div></div>
+              <div class="f"><label>Prix aFRR retenu</label><div class="ir"><input type="number" id="cons-afrr-price" value="8" min="0" max="200" step="0.5"/><div class="iu">€/MW/h</div></div></div>
+              <div class="f"><label>Commission agrégateur</label><div class="ir"><input type="number" id="cons-afrr-agg" value="38" min="0" max="60" step="1"/><div class="iu">%</div></div></div>
             </div>
           </div>
         </div>
       </div>
       <div>
         <div class="card">
-          <div class="ch"><div class="ico">📈</div><h2>Arbitrage Day-Ahead / Intraday</h2></div>
+          <div class="ch"><div class="ico">📈</div><h2>Arbitrage — Conservateur</h2></div>
           <div class="cb">
-            <div class="f"><label>Utiliser les prix spot des données <span class="h">(si fournis)</span></label>
-              <select id="cons-arb-mode">
-                <option value="auto">Automatique (spot si dispo, sinon TOU)</option>
-                <option value="tou">Tarif Jour/Nuit uniquement</option>
-                <option value="disabled">Désactivé</option>
-              </select>
-            </div>
-            <div class="f"><label>Spread arbitrage estimé <span class="h">(si pas de prix spot)</span></label><div class="ir"><input type="number" id="cons-arb-spread" value="40" min="0" max="300" step="1"/><div class="iu">€/MWh</div></div></div>
-            <div class="f"><label>Nb cycles arbitrage / jour estimé</label><div class="ir"><input type="number" id="cons-arb-cycles" value="0.5" min="0" max="3" step="0.1"/><div class="iu">cycles/jour</div></div></div>
-            <div class="ib warn" style="margin-top:6px">Scénario conservateur : arbitrage limité, prix FCR bas 2025.</div>
+            <div class="f"><label>Mode</label><select id="cons-arb-mode"><option value="auto">Auto (spot si dispo, sinon TOU)</option><option value="tou">TOU Jour/Nuit uniquement</option><option value="disabled">Désactivé</option></select></div>
+            <div class="f"><label>Spread estimé (sans données spot)</label><div class="ir"><input type="number" id="cons-arb-spread" value="40" min="0" max="300" step="1"/><div class="iu">€/MWh</div></div></div>
+            <div class="f"><label>Cycles arbitrage / jour estimé</label><div class="ir"><input type="number" id="cons-arb-cycles" value="0.5" min="0" max="3" step="0.1"/><div class="iu">cycles/jour</div></div></div>
           </div>
         </div>
         <div class="card">
-          <div class="ch"><div class="ico">📊</div><h2>Imbalance Market</h2></div>
+          <div class="ch"><div class="ico">📊</div><h2>Imbalance — Conservateur</h2></div>
           <div class="cb">
-            <div class="f"><label>Revenus imbalance estimés <span class="h">(€/kWh capacité/an)</span></label>
-              <div class="ir"><input type="number" id="cons-imbal" value="0" min="0" max="200" step="1"/><div class="iu">€/kWh/an</div></div>
-            </div>
-            <div class="ib" style="margin-top:6px;font-size:.68rem">Revenus imbalance très volatils — désactivé en scénario conservateur. Activer en Base/Optimiste si accord agrégateur.</div>
+            <div class="f"><label>Revenus imbalance</label><div class="ir"><input type="number" id="cons-imbal" value="0" min="0" max="200" step="1"/><div class="iu">€/kWh capacité/an</div></div></div>
+            <div class="ib warn">Désactivé en scénario conservateur — marché très volatile.</div>
           </div>
         </div>
       </div>
     </div>
   </div>
 
-  <!-- Base scenario (same structure, different values) -->
+  <!-- Base -->
   <div class="scen-panel" id="scen-base">
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
       <div>
         <div class="card">
-          <div class="ch"><div class="ico">🔄</div><h2>FCR — Scénario Base</h2></div>
+          <div class="ch"><div class="ico">🔄</div><h2>FCR — Base <span style="font-size:.7rem;color:var(--g400);font-weight:400">(moyenne 2021-2024 : ~34 €/MW/h)</span></h2></div>
           <div class="cb">
             <div class="g2">
               <div class="f"><label>% Batterie réservé FCR</label><div class="ir"><input type="number" id="base-fcr-frac" value="40" min="0" max="100" step="5"/><div class="iu">%</div></div></div>
               <div class="f"><label>Disponibilité</label><div class="ir"><input type="number" id="base-fcr-avail" value="93" min="0" max="100" step="1"/><div class="iu">%</div></div></div>
               <div class="f"><label>Prix FCR retenu</label><div class="ir"><input type="number" id="base-fcr-price" value="30" min="0" max="200" step="0.5"/><div class="iu">€/MW/h</div></div></div>
-              <div class="f"><label>% Commission agrégateur</label><div class="ir"><input type="number" id="base-fcr-agg" value="38" min="0" max="60" step="1"/><div class="iu">%</div></div></div>
+              <div class="f"><label>Commission agrégateur</label><div class="ir"><input type="number" id="base-fcr-agg" value="38" min="0" max="60" step="1"/><div class="iu">%</div></div></div>
             </div>
-            <div class="ib" style="margin-top:8px">Prix moyen 2021–2024 : ~34 €/MW/h. Scénario base retient 30 €/MW/h par prudence.</div>
           </div>
         </div>
         <div class="card">
-          <div class="ch"><div class="ico">⚡</div><h2>aFRR — Scénario Base</h2></div>
+          <div class="ch"><div class="ico">⚡</div><h2>aFRR — Base</h2></div>
           <div class="cb">
             <div class="g2">
               <div class="f"><label>% Batterie réservé aFRR</label><div class="ir"><input type="number" id="base-afrr-frac" value="10" min="0" max="100" step="5"/><div class="iu">%</div></div></div>
               <div class="f"><label>Disponibilité</label><div class="ir"><input type="number" id="base-afrr-avail" value="88" min="0" max="100" step="1"/><div class="iu">%</div></div></div>
               <div class="f"><label>Prix aFRR retenu</label><div class="ir"><input type="number" id="base-afrr-price" value="12" min="0" max="200" step="0.5"/><div class="iu">€/MW/h</div></div></div>
-              <div class="f"><label>% Commission agrégateur</label><div class="ir"><input type="number" id="base-afrr-agg" value="35" min="0" max="60" step="1"/><div class="iu">%</div></div></div>
+              <div class="f"><label>Commission agrégateur</label><div class="ir"><input type="number" id="base-afrr-agg" value="35" min="0" max="60" step="1"/><div class="iu">%</div></div></div>
             </div>
           </div>
         </div>
       </div>
       <div>
         <div class="card">
-          <div class="ch"><div class="ico">📈</div><h2>Arbitrage — Scénario Base</h2></div>
+          <div class="ch"><div class="ico">📈</div><h2>Arbitrage — Base</h2></div>
           <div class="cb">
-            <div class="f"><label>Mode arbitrage</label>
-              <select id="base-arb-mode">
-                <option value="auto" selected>Automatique (spot si dispo, sinon TOU)</option>
-                <option value="tou">Tarif Jour/Nuit uniquement</option>
-                <option value="disabled">Désactivé</option>
-              </select>
-            </div>
-            <div class="f"><label>Spread arbitrage estimé</label><div class="ir"><input type="number" id="base-arb-spread" value="60" min="0" max="300" step="1"/><div class="iu">€/MWh</div></div></div>
-            <div class="f"><label>Nb cycles arbitrage / jour</label><div class="ir"><input type="number" id="base-arb-cycles" value="1.0" min="0" max="3" step="0.1"/><div class="iu">cycles/jour</div></div></div>
+            <div class="f"><label>Mode</label><select id="base-arb-mode"><option value="auto" selected>Auto (spot si dispo, sinon TOU)</option><option value="tou">TOU Jour/Nuit</option><option value="disabled">Désactivé</option></select></div>
+            <div class="f"><label>Spread estimé</label><div class="ir"><input type="number" id="base-arb-spread" value="60" min="0" max="300" step="1"/><div class="iu">€/MWh</div></div></div>
+            <div class="f"><label>Cycles / jour</label><div class="ir"><input type="number" id="base-arb-cycles" value="1.0" min="0" max="3" step="0.1"/><div class="iu">cycles/jour</div></div></div>
           </div>
         </div>
         <div class="card">
-          <div class="ch"><div class="ico">📊</div><h2>Imbalance — Scénario Base</h2></div>
+          <div class="ch"><div class="ico">📊</div><h2>Imbalance — Base</h2></div>
           <div class="cb">
-            <div class="f"><label>Revenus imbalance estimés</label><div class="ir"><input type="number" id="base-imbal" value="5" min="0" max="200" step="1"/><div class="iu">€/kWh/an</div></div></div>
+            <div class="f"><label>Revenus imbalance</label><div class="ir"><input type="number" id="base-imbal" value="5" min="0" max="200" step="1"/><div class="iu">€/kWh/an</div></div></div>
           </div>
         </div>
       </div>
     </div>
   </div>
 
-  <!-- Optimiste scenario -->
+  <!-- Optimiste -->
   <div class="scen-panel" id="scen-opti">
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
       <div>
         <div class="card">
-          <div class="ch"><div class="ico">🔄</div><h2>FCR — Scénario Optimiste</h2></div>
+          <div class="ch"><div class="ico">🔄</div><h2>FCR — Optimiste <span style="font-size:.7rem;color:var(--g400);font-weight:400">(prix 2024 : 43.73 €/MW/h)</span></h2></div>
           <div class="cb">
             <div class="g2">
               <div class="f"><label>% Batterie réservé FCR</label><div class="ir"><input type="number" id="opti-fcr-frac" value="50" min="0" max="100" step="5"/><div class="iu">%</div></div></div>
               <div class="f"><label>Disponibilité</label><div class="ir"><input type="number" id="opti-fcr-avail" value="96" min="0" max="100" step="1"/><div class="iu">%</div></div></div>
               <div class="f"><label>Prix FCR retenu</label><div class="ir"><input type="number" id="opti-fcr-price" value="43.73" min="0" max="200" step="0.01"/><div class="iu">€/MW/h</div></div></div>
-              <div class="f"><label>% Commission agrégateur</label><div class="ir"><input type="number" id="opti-fcr-agg" value="35" min="0" max="60" step="1"/><div class="iu">%</div></div></div>
+              <div class="f"><label>Commission agrégateur</label><div class="ir"><input type="number" id="opti-fcr-agg" value="35" min="0" max="60" step="1"/><div class="iu">%</div></div></div>
             </div>
-            <div class="ib ok" style="margin-top:8px">Prix 2024 (43.73 €/MW/h) retenu pour scénario optimiste.</div>
           </div>
         </div>
         <div class="card">
-          <div class="ch"><div class="ico">⚡</div><h2>aFRR — Scénario Optimiste</h2></div>
+          <div class="ch"><div class="ico">⚡</div><h2>aFRR — Optimiste</h2></div>
           <div class="cb">
             <div class="g2">
               <div class="f"><label>% Batterie réservé aFRR</label><div class="ir"><input type="number" id="opti-afrr-frac" value="15" min="0" max="100" step="5"/><div class="iu">%</div></div></div>
               <div class="f"><label>Disponibilité</label><div class="ir"><input type="number" id="opti-afrr-avail" value="92" min="0" max="100" step="1"/><div class="iu">%</div></div></div>
               <div class="f"><label>Prix aFRR retenu</label><div class="ir"><input type="number" id="opti-afrr-price" value="18" min="0" max="200" step="0.5"/><div class="iu">€/MW/h</div></div></div>
-              <div class="f"><label>% Commission agrégateur</label><div class="ir"><input type="number" id="opti-afrr-agg" value="30" min="0" max="60" step="1"/><div class="iu">%</div></div></div>
+              <div class="f"><label>Commission agrégateur</label><div class="ir"><input type="number" id="opti-afrr-agg" value="30" min="0" max="60" step="1"/><div class="iu">%</div></div></div>
             </div>
           </div>
         </div>
       </div>
       <div>
         <div class="card">
-          <div class="ch"><div class="ico">📈</div><h2>Arbitrage — Scénario Optimiste</h2></div>
+          <div class="ch"><div class="ico">📈</div><h2>Arbitrage — Optimiste</h2></div>
           <div class="cb">
-            <div class="f"><label>Mode arbitrage</label>
-              <select id="opti-arb-mode">
-                <option value="auto" selected>Automatique (spot si dispo, sinon TOU)</option>
-                <option value="tou">Tarif Jour/Nuit uniquement</option>
-                <option value="disabled">Désactivé</option>
-              </select>
-            </div>
-            <div class="f"><label>Spread arbitrage estimé</label><div class="ir"><input type="number" id="opti-arb-spread" value="80" min="0" max="300" step="1"/><div class="iu">€/MWh</div></div></div>
-            <div class="f"><label>Nb cycles arbitrage / jour</label><div class="ir"><input type="number" id="opti-arb-cycles" value="1.5" min="0" max="3" step="0.1"/><div class="iu">cycles/jour</div></div></div>
+            <div class="f"><label>Mode</label><select id="opti-arb-mode"><option value="auto" selected>Auto</option><option value="tou">TOU</option><option value="disabled">Désactivé</option></select></div>
+            <div class="f"><label>Spread estimé</label><div class="ir"><input type="number" id="opti-arb-spread" value="80" min="0" max="300" step="1"/><div class="iu">€/MWh</div></div></div>
+            <div class="f"><label>Cycles / jour</label><div class="ir"><input type="number" id="opti-arb-cycles" value="1.5" min="0" max="3" step="0.1"/><div class="iu">cycles/jour</div></div></div>
           </div>
         </div>
         <div class="card">
-          <div class="ch"><div class="ico">📊</div><h2>Imbalance — Scénario Optimiste</h2></div>
+          <div class="ch"><div class="ico">📊</div><h2>Imbalance — Optimiste</h2></div>
           <div class="cb">
-            <div class="f"><label>Revenus imbalance estimés</label><div class="ir"><input type="number" id="opti-imbal" value="15" min="0" max="200" step="1"/><div class="iu">€/kWh/an</div></div></div>
+            <div class="f"><label>Revenus imbalance</label><div class="ir"><input type="number" id="opti-imbal" value="15" min="0" max="200" step="1"/><div class="iu">€/kWh/an</div></div></div>
           </div>
         </div>
       </div>
@@ -539,49 +746,32 @@ footer{text-align:center;padding:14px;font-size:.65rem;color:var(--g400)}
 
 <!-- ═══ TAB 4: FINANCEMENT ═══ -->
 <div class="tab-section" id="t4">
-  <div class="card" style="margin-bottom:16px">
+  <div class="card" style="margin-bottom:14px">
     <div class="ch"><div class="ico">💶</div><h2>Modèle de financement</h2></div>
     <div class="cb">
-      <div class="model-sel" id="fin-model-sel">
-        <button class="msb active" data-model="tiers">
-          <div class="msb-icon">🤝</div>
-          <div class="msb-title">Tiers-Investissement</div>
-          <div class="msb-sub">WGI finance, revenus partagés après déductions</div>
-        </button>
-        <button class="msb" data-model="propres">
-          <div class="msb-icon">🏢</div>
-          <div class="msb-title">Fonds Propres Client</div>
-          <div class="msb-sub">Client finance, tous les revenus nets lui reviennent</div>
-        </button>
-        <button class="msb" data-model="leasing">
-          <div class="msb-icon">📋</div>
-          <div class="msb-title">Leasing</div>
-          <div class="msb-sub">Client paie un loyer fixe à WGI</div>
-        </button>
+      <div class="model-sel">
+        <button class="msb active" data-model="tiers"><div class="msb-icon">🤝</div><div class="msb-title">Tiers-Investissement</div><div class="msb-sub">WGI finance, revenus partagés après déductions</div></button>
+        <button class="msb" data-model="propres"><div class="msb-icon">🏢</div><div class="msb-title">Fonds Propres Client</div><div class="msb-sub">Client finance, tous les revenus nets lui reviennent</div></button>
+        <button class="msb" data-model="leasing"><div class="msb-icon">📋</div><div class="msb-title">Leasing</div><div class="msb-sub">Client paie un loyer fixe à WGI</div></button>
       </div>
     </div>
   </div>
-
-  <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
     <div>
       <div class="card">
         <div class="ch"><div class="ico">🏗️</div><h2>CAPEX & OPEX</h2></div>
         <div class="cb">
-          <div class="sec">Investissement</div>
           <div class="g2">
-            <div class="f"><label>CAPEX Batterie</label><div class="ir"><input type="number" id="fin-capex-batt" value="44075" min="0" max="10000000" step="100"/><div class="iu">€</div></div></div>
-            <div class="f"><label>CAPEX Installation</label><div class="ir"><input type="number" id="fin-capex-install" value="5000" min="0" max="1000000" step="100"/><div class="iu">€</div></div></div>
-            <div class="f"><label>Provision recyclage</label><div class="ir"><input type="number" id="fin-capex-recycle" value="4400" min="0" max="100000" step="100"/><div class="iu">€</div></div></div>
-            <div class="f"><label>Subside / déduction</label><div class="ir"><input type="number" id="fin-capex-subsidy" value="0" min="0" max="500000" step="100"/><div class="iu">€</div></div></div>
+            <div class="f"><label>CAPEX Batterie</label><div class="ir"><input type="number" id="fin-capex-batt" value="44075" step="100"/><div class="iu">€</div></div></div>
+            <div class="f"><label>CAPEX Installation</label><div class="ir"><input type="number" id="fin-capex-install" value="5000" step="100"/><div class="iu">€</div></div></div>
+            <div class="f"><label>Provision recyclage</label><div class="ir"><input type="number" id="fin-capex-recycle" value="4400" step="100"/><div class="iu">€</div></div></div>
+            <div class="f"><label>Subside / déduction</label><div class="ir"><input type="number" id="fin-capex-subsidy" value="0" step="100"/><div class="iu">€</div></div></div>
+            <div class="f"><label>OPEX / Maintenance</label><div class="ir"><input type="number" id="fin-opex" value="1200" step="100"/><div class="iu">€/an</div></div></div>
+            <div class="f"><label>EMS / Software</label><div class="ir"><input type="number" id="fin-ems" value="200" step="50"/><div class="iu">€/an</div></div></div>
           </div>
-          <div class="dr" style="padding:8px 0;margin-top:4px;border-top:2px solid var(--g200)">
-            <span style="font-size:.78rem;font-weight:600">CAPEX Net total</span>
-            <span style="font-family:'DM Mono',monospace;font-weight:700;color:var(--gp)" id="capex-net-display">—</span>
-          </div>
-          <div class="sec">Coûts annuels</div>
-          <div class="g2">
-            <div class="f"><label>OPEX / Maintenance</label><div class="ir"><input type="number" id="fin-opex" value="1200" min="0" max="100000" step="100"/><div class="iu">€/an</div></div></div>
-            <div class="f"><label>EMS / Software</label><div class="ir"><input type="number" id="fin-ems" value="200" min="0" max="50000" step="50"/><div class="iu">€/an</div></div></div>
+          <div class="dr" style="padding:7px 0;margin-top:6px;border-top:2px solid var(--g200)">
+            <span style="font-size:.76rem;font-weight:700">CAPEX Net total</span>
+            <span style="font-family:'DM Mono',monospace;font-weight:700;color:var(--gp)" id="capex-net-disp">—</span>
           </div>
         </div>
       </div>
@@ -589,74 +779,49 @@ footer{text-align:center;padding:14px;font-size:.65rem;color:var(--g400)}
       <div class="card" id="fin-tiers-card">
         <div class="ch"><div class="ico">🤝</div><h2>Partage des revenus (Tiers-Invest)</h2></div>
         <div class="cb">
-          <div class="ib" style="margin-bottom:10px">
+          <div class="ib" style="margin-bottom:8px">
             Revenus nets = Total brut − Frais agrégateurs − EMS − OPEX<br/>
             WGI déduit ensuite les coûts de financement de sa part.
           </div>
           <div class="g2">
-            <div class="f"><label>Part WGI (des revenus nets)</label><div class="ir"><input type="number" id="fin-wgi-share" value="60" min="1" max="99" step="1"/><div class="iu">%</div></div></div>
-            <div class="f"><label>Part Client</label><div class="ir"><input type="number" id="fin-client-share-disp" value="40" disabled/><div class="iu">%</div></div></div>
-          </div>
-          <div class="sec">Financement WGI</div>
-          <div class="g2">
+            <div class="f"><label>Part WGI (revenus nets)</label><div class="ir"><input type="number" id="fin-wgi-share" value="60" min="1" max="99" step="1"/><div class="iu">%</div></div></div>
+            <div class="f"><label>Part Client</label><div class="ir"><input type="number" id="fin-client-disp" value="40" disabled/><div class="iu">%</div></div></div>
             <div class="f"><label>% Financement bancaire</label><div class="ir"><input type="number" id="fin-debt-ratio" value="70" min="0" max="100" step="1"/><div class="iu">%</div></div></div>
             <div class="f"><label>% Fonds propres WGI</label><div class="ir"><input type="number" id="fin-equity-disp" value="30" disabled/><div class="iu">%</div></div></div>
-            <div class="f"><label>Taux intérêt bancaire</label><div class="ir"><input type="number" id="fin-loan-rate" value="4.5" min="0" max="20" step="0.1"/><div class="iu">%/an</div></div></div>
-            <div class="f"><label>Durée prêt</label><div class="ir"><input type="number" id="fin-loan-years" value="7" min="1" max="20" step="1"/><div class="iu">ans</div></div></div>
+            <div class="f"><label>Taux intérêt bancaire</label><div class="ir"><input type="number" id="fin-loan-rate" value="4.5" step="0.1"/><div class="iu">%/an</div></div></div>
+            <div class="f"><label>Durée prêt</label><div class="ir"><input type="number" id="fin-loan-years" value="7" step="1"/><div class="iu">ans</div></div></div>
           </div>
         </div>
       </div>
-
       <div class="card hidden" id="fin-leasing-card">
         <div class="ch"><div class="ico">📋</div><h2>Leasing</h2></div>
-        <div class="cb">
-          <div class="g2">
-            <div class="f"><label>Loyer annuel (fixe)</label><div class="ir"><input type="number" id="fin-lease-annual" value="8000" min="0" max="500000" step="100"/><div class="iu">€/an</div></div></div>
-            <div class="f"><label>Durée du leasing</label><div class="ir"><input type="number" id="fin-lease-years" value="15" min="1" max="25" step="1"/><div class="iu">ans</div></div></div>
-          </div>
-        </div>
+        <div class="cb"><div class="g2">
+          <div class="f"><label>Loyer annuel</label><div class="ir"><input type="number" id="fin-lease-annual" value="8000" step="100"/><div class="iu">€/an</div></div></div>
+          <div class="f"><label>Durée leasing</label><div class="ir"><input type="number" id="fin-lease-years" value="15" step="1"/><div class="iu">ans</div></div></div>
+        </div></div>
       </div>
     </div>
-
     <div>
       <div class="card">
-        <div class="ch"><div class="ico">📐</div><h2>Hypothèses financières</h2></div>
+        <div class="ch"><div class="ico">📐</div><h2>Hypothèses financières & Récapitulatif</h2></div>
         <div class="cb">
           <div class="g2">
-            <div class="f"><label>WACC (taux actualisation)</label><div class="ir"><input type="number" id="fin-wacc" value="8" min="1" max="25" step="0.5"/><div class="iu">%</div></div></div>
-            <div class="f"><label>Durée du contrat</label><div class="ir"><input type="number" id="fin-duration" value="15" min="5" max="25" step="1"/><div class="iu">ans</div></div></div>
-            <div class="f"><label>Inflation annuelle revenus</label><div class="ir"><input type="number" id="fin-inflation" value="1.5" min="-5" max="10" step="0.5"/><div class="iu">%/an</div></div></div>
-            <div class="f"><label>TVA applicable</label>
-              <select id="fin-tva"><option value="0">0%</option><option value="6">6%</option><option value="21" selected>21%</option></select>
-            </div>
+            <div class="f"><label>WACC</label><div class="ir"><input type="number" id="fin-wacc" value="8" step="0.5"/><div class="iu">%</div></div></div>
+            <div class="f"><label>Durée contrat</label><div class="ir"><input type="number" id="fin-duration" value="15" step="1"/><div class="iu">ans</div></div></div>
+            <div class="f"><label>Inflation revenus/an</label><div class="ir"><input type="number" id="fin-inflation" value="1.5" step="0.5"/><div class="iu">%/an</div></div></div>
+            <div class="f"><label>TVA</label><select id="fin-tva"><option value="0">0%</option><option value="6">6%</option><option value="21" selected>21%</option></select></div>
           </div>
-          <div class="ib" style="margin-top:8px">
-            WACC Battscan de référence : <strong>8%</strong>. Durée de vie batterie : 15 ans.
-          </div>
-        </div>
-      </div>
-
-      <div class="card">
-        <div class="ch"><div class="ico">🔢</div><h2>Récapitulatif CAPEX</h2></div>
-        <div class="cb" id="capex-recap">
-          <div class="stat-chips">
+          <div class="chips" style="margin-top:10px">
             <div class="chip"><div class="chip-l">CAPEX Brut</div><div class="chip-v" id="r-capex-brut">—</div></div>
             <div class="chip"><div class="chip-l">CAPEX Net</div><div class="chip-v" id="r-capex-net">—</div></div>
             <div class="chip"><div class="chip-l">Fonds propres WGI</div><div class="chip-v" id="r-equity">—</div></div>
-            <div class="chip"><div class="chip-l">Emprunt</div><div class="chip-v" id="r-debt">—</div></div>
             <div class="chip"><div class="chip-l">Annuité bancaire</div><div class="chip-v" id="r-annuity">—</div></div>
           </div>
         </div>
       </div>
-
-      <div style="margin-top:16px">
-        <button class="btn btn-green btn-lg" style="width:100%;justify-content:center" onclick="runSimulation()">
-          🚀 Lancer la simulation et calculer les résultats
-        </button>
-        <div class="progress-wrap" id="sim-progress" style="margin-top:10px">
-          <div class="prog-bar"><div class="prog-fill" id="sim-fill" style="width:0%"></div></div>
-          <div class="prog-label" id="sim-label">Initialisation...</div>
-        </div>
+      <div style="margin-top:14px">
+        <button class="btn btn-green btn-lg" style="width:100%;justify-content:center" onclick="runSimulation()">🚀 Lancer la simulation</button>
+        <div class="prog-wrap" id="prog-sim" style="margin-top:9px"><div class="prog-bar"><div class="prog-fill" id="fill-sim" style="width:0%"></div></div><div class="prog-lbl" id="lbl-sim">—</div></div>
       </div>
     </div>
   </div>
@@ -665,1009 +830,1001 @@ footer{text-align:center;padding:14px;font-size:.65rem;color:var(--g400)}
 <!-- ═══ TAB 5: RÉSULTATS ═══ -->
 <div class="tab-section" id="t5">
   <div id="res-placeholder" class="card">
-    <div class="cb" style="text-align:center;padding:40px">
-      <div style="font-size:2rem;margin-bottom:10px">📊</div>
-      <div style="font-weight:600;color:var(--g700)">Aucun résultat disponible</div>
-      <div style="color:var(--g400);font-size:.82rem;margin-top:4px">Importez des données, configurez les paramètres et lancez la simulation depuis l'onglet Financement.</div>
+    <div class="cb" style="text-align:center;padding:36px">
+      <div style="font-size:1.8rem;margin-bottom:8px">📊</div>
+      <div style="font-weight:600;color:var(--g700)">Aucun résultat</div>
+      <div style="color:var(--g400);font-size:.8rem;margin-top:4px">Importez les données (Tab 1), configurez et lancez la simulation depuis l'onglet Financement.</div>
     </div>
   </div>
-
   <div id="res-content" class="hidden">
-
-    <!-- Header résultats -->
     <div class="res-header">
-      <div>
-        <div class="res-title" id="res-title">Résultats de simulation BESS</div>
-        <div class="res-sub" id="res-subtitle">—</div>
-      </div>
-      <div style="display:flex;gap:8px;flex-wrap:wrap">
-        <button class="btn btn-secondary" onclick="exportResults()">📥 Exporter CSV</button>
-      </div>
+      <div><div class="res-title" id="res-title">—</div><div class="res-sub" id="res-sub">—</div></div>
+      <button class="btn btn-secondary" onclick="exportCSV()">📥 Export CSV</button>
     </div>
-
-    <!-- KPI bar -->
     <div class="kg" id="res-kpis"></div>
-
-    <!-- SECTION 1: Profil annuel -->
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px">
-      <div class="card">
-        <div class="ch"><div class="ico">📋</div><h2>Profil annuel — Avant batterie</h2></div>
-        <div class="cb" id="res-baseline"></div>
-      </div>
-      <div class="card">
-        <div class="ch"><div class="ico">🔋</div><h2>Profil annuel — Avec batterie</h2></div>
-        <div class="cb" id="res-withbatt"></div>
-      </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px">
+      <div class="card"><div class="ch"><div class="ico">📋</div><h2>Profil — Avant batterie</h2></div><div class="cb" id="res-before"></div></div>
+      <div class="card"><div class="ch"><div class="ico">🔋</div><h2>Profil — Avec batterie</h2></div><div class="cb" id="res-after"></div></div>
     </div>
-
-    <!-- SECTION 2: Revenus par source -->
-    <div class="card" style="margin-bottom:16px">
-      <div class="ch"><div class="ico">💰</div><h2>Revenus annuels estimés — Scénario Base</h2></div>
-      <div class="cb">
-        <table class="rev-table" id="res-rev-table"></table>
-      </div>
+    <div class="card" style="margin-bottom:14px"><div class="ch"><div class="ico">💰</div><h2>Revenus annuels — Scénario Base</h2></div><div class="cb"><table class="rev-table" id="res-rev-table"></table></div></div>
+    <div class="card" style="margin-bottom:14px"><div class="ch"><div class="ico">⚖️</div><h2>Comparaison scénarios</h2></div><div class="cb"><div class="scen-compare" id="res-scen-compare"></div></div></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px">
+      <div class="card"><div class="ch"><div class="ico">📊</div><h2>Revenus mensuels par source</h2></div><div class="cb"><div class="cw"><canvas id="chart-monthly"></canvas></div></div></div>
+      <div class="card"><div class="ch"><div class="ico">📈</div><h2>Profil hebdomadaire — dispatch batterie</h2></div><div class="cb"><div class="cw"><canvas id="chart-weekly"></canvas></div></div></div>
     </div>
-
-    <!-- SECTION 3: Comparaison scénarios -->
-    <div class="card" style="margin-bottom:16px">
-      <div class="ch"><div class="ico">⚖️</div><h2>Comparaison des 3 scénarios</h2></div>
-      <div class="cb">
-        <div class="scen-compare" id="res-scen-compare"></div>
-      </div>
-    </div>
-
-    <!-- SECTION 4: Charts -->
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px">
-      <div class="card">
-        <div class="ch"><div class="ico">📊</div><h2>Revenus mensuels par source</h2></div>
-        <div class="cb"><div class="cw"><canvas id="chart-monthly-rev"></canvas></div></div>
-      </div>
-      <div class="card">
-        <div class="ch"><div class="ico">📈</div><h2>Profil hebdomadaire type (batterie)</h2></div>
-        <div class="cb"><div class="cw"><canvas id="chart-weekly"></canvas></div></div>
-      </div>
-    </div>
-
-    <!-- SECTION 5: Business case -->
     <div class="card">
-      <div class="ch"><div class="ico">💶</div><h2>Business Case WGI — Cash Flows annuels</h2></div>
+      <div class="ch"><div class="ico">💶</div><h2>Business Case — Cash Flows annuels</h2></div>
       <div class="cb">
-        <div style="overflow-x:auto;max-height:320px;overflow-y:auto">
-          <table class="cf-table" id="res-cf-table"></table>
-        </div>
-        <div class="npv-box" id="res-npv-box" style="margin-top:12px;background:var(--gpa);border:1px solid var(--gl);border-radius:9px;padding:12px 16px">
-          <div style="font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--gm);margin-bottom:8px">Synthèse Valeur & Rentabilité</div>
-          <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:10px" id="res-npv-grid"></div>
-          <div style="font-size:.65rem;color:var(--g400);margin-top:8px;text-align:center;border-top:1px solid var(--g200);padding-top:6px" id="res-npv-note">—</div>
+        <div style="overflow-x:auto;max-height:300px;overflow-y:auto"><table class="cf-table" id="res-cf-table"></table></div>
+        <div style="background:var(--gpa);border:1px solid var(--gl);border-radius:9px;padding:11px 14px;margin-top:10px">
+          <div style="font-size:.67rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--gm);margin-bottom:8px">Synthèse Valeur</div>
+          <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:9px" id="res-npv-grid"></div>
+          <div style="font-size:.63rem;color:var(--g400);margin-top:7px;text-align:center;border-top:1px solid var(--g200);padding-top:5px" id="res-npv-note">—</div>
         </div>
       </div>
     </div>
-
   </div>
 </div>
 
 </main>
-<footer>We Green Invest · Simulateur BESS v1.0 · Simulation dispatch sur profils quart-horaires réels · Résultats indicatifs · Confidentiel</footer>
+<footer>We Green Invest · Simulateur BESS v2.0 · PV simulé sur profil météo typique belge · Dispatch sur données réelles · Confidentiel</footer>
 
 <script>
-// ═══════════════════════════════════════════════════════════
-// STATE
-// ═══════════════════════════════════════════════════════════
+// ═══════════════════════════════ STATE ═══════════════════════════════
 const S = {
-  rawSlots: null,      // parsed 15-min slots
-  colMap: {},          // column assignments
-  simResults: null,    // simulation output
-  finModel: 'tiers',   // active financial model
+  conso: null,     // [{ts,cons,inj}] 
+  pvSlots: null,   // [{ts,pv}]
+  spotPrices: null,// [{ts,price}]  
+  pvMode: 'simulate',
+  priceType: 'tou',
+  finModel: 'tiers',
+  simResults: null,
+  selectedCity: 'Bruxelles',
+  selectedOrient: 0,
 };
 
-const fmt = (v,d=0) => (v==null||isNaN(v)) ? '—' : v.toLocaleString('fr-BE',{minimumFractionDigits:d,maximumFractionDigits:d});
-const fE  = (v,d=0) => fmt(v,d) + ' €';
-const fP  = (v,d=1) => fmt(v*100,d) + ' %';
+const fmt = (v,d=0) => (v==null||isNaN(v))?'—':v.toLocaleString('fr-BE',{minimumFractionDigits:d,maximumFractionDigits:d});
+const fE  = (v,d=0) => fmt(v,d)+' €';
+const fP  = (v,d=1) => fmt(v*100,d)+' %';
 const el  = id => document.getElementById(id);
 
-// ═══════════════════════════════════════════════════════════
-// NAVIGATION
-// ═══════════════════════════════════════════════════════════
-document.querySelectorAll('.ntab').forEach(tab => {
-  tab.addEventListener('click', () => {
-    document.querySelectorAll('.ntab').forEach(t => t.classList.remove('active'));
-    document.querySelectorAll('.tab-section').forEach(s => s.classList.remove('active'));
-    tab.classList.add('active');
-    el('t' + tab.dataset.tab.slice(1)).classList.add('active');
-  });
-});
+// ═══════════════════════════ BELGIAN CITIES ═══════════════════════════
+// Monthly average GHI kWh/m²/day · latitude · longitude · annual kWh/m²
+const CITIES = {
+  'Bruxelles':  {lat:50.85,lng:4.35,  ghi:[0.58,1.28,2.47,3.72,4.95,5.35,5.18,4.48,2.95,1.56,0.65,0.48],annual:970},
+  'Gent':       {lat:51.05,lng:3.72,  ghi:[0.62,1.35,2.55,3.80,5.05,5.45,5.28,4.56,3.02,1.62,0.70,0.52],annual:1005},
+  'Anvers':     {lat:51.22,lng:4.40,  ghi:[0.60,1.32,2.52,3.78,5.02,5.42,5.24,4.52,2.98,1.60,0.68,0.50],annual:993},
+  'Bruges':     {lat:51.21,lng:3.22,  ghi:[0.64,1.38,2.58,3.84,5.08,5.48,5.32,4.60,3.06,1.65,0.72,0.54],annual:1015},
+  'Liège':      {lat:50.63,lng:5.57,  ghi:[0.56,1.25,2.45,3.68,4.90,5.28,5.12,4.42,2.90,1.52,0.63,0.46],annual:960},
+  'Namur':      {lat:50.47,lng:4.86,  ghi:[0.60,1.31,2.50,3.76,5.01,5.41,5.23,4.53,2.99,1.59,0.68,0.51],annual:990},
+  'Charleroi':  {lat:50.41,lng:4.44,  ghi:[0.57,1.26,2.46,3.70,4.92,5.30,5.15,4.44,2.92,1.53,0.64,0.47],annual:963},
+  'Mons':       {lat:50.45,lng:3.95,  ghi:[0.58,1.27,2.46,3.70,4.93,5.33,5.16,4.46,2.93,1.54,0.64,0.47],annual:965},
+  'Hasselt':    {lat:50.93,lng:5.33,  ghi:[0.59,1.29,2.48,3.73,4.97,5.37,5.20,4.49,2.96,1.57,0.66,0.49],annual:978},
+  'Leuven':     {lat:50.88,lng:4.70,  ghi:[0.59,1.30,2.49,3.74,4.98,5.38,5.21,4.50,2.97,1.58,0.67,0.50],annual:981},
+  'Arlon':      {lat:49.68,lng:5.81,  ghi:[0.62,1.33,2.53,3.79,5.04,5.44,5.26,4.55,3.01,1.61,0.70,0.52],annual:999},
+  'Ostende':    {lat:51.23,lng:2.91,  ghi:[0.65,1.40,2.60,3.86,5.10,5.50,5.34,4.62,3.08,1.67,0.74,0.56],annual:1022},
+};
 
-// ═══════════════════════════════════════════════════════════
-// SCENARIO TABS
-// ═══════════════════════════════════════════════════════════
-document.querySelectorAll('.stab').forEach(t => {
-  t.addEventListener('click', () => {
-    document.querySelectorAll('.stab').forEach(x => x.classList.remove('active'));
-    document.querySelectorAll('.scen-panel').forEach(p => p.classList.remove('active'));
+// Orientation factors (vs South=0°, positive=West)
+const ORIENTATIONS = [
+  {label:'Sud (S)',       deg:0,   factor:1.000},
+  {label:'Sud-Est (SE)',  deg:-45, factor:0.934},
+  {label:'Sud-Ouest (SO)',deg:45,  factor:0.934},
+  {label:'Est (E)',       deg:-90, factor:0.748},
+  {label:'Ouest (O)',     deg:90,  factor:0.748},
+  {label:'Nord-Est (NE)', deg:-135,factor:0.531},
+  {label:'Nord-Ouest (NO)',deg:135,factor:0.531},
+  {label:'Plat (0° tilt)',deg:0,   factor:0.872},
+];
+
+// ═══════════════════════ NAVIGATION ═══════════════════════
+document.querySelectorAll('.ntab').forEach(t=>{
+  t.addEventListener('click',()=>{
+    document.querySelectorAll('.ntab').forEach(x=>x.classList.remove('active'));
+    document.querySelectorAll('.tab-section').forEach(x=>x.classList.remove('active'));
     t.classList.add('active');
-    el('scen-' + t.dataset.scen).classList.add('active');
+    el('t'+t.dataset.tab.slice(1)).classList.add('active');
+    updateRecap();
   });
 });
 
-// ═══════════════════════════════════════════════════════════
-// FINANCIAL MODEL SELECTOR
-// ═══════════════════════════════════════════════════════════
-document.querySelectorAll('.msb').forEach(b => {
-  b.addEventListener('click', () => {
-    document.querySelectorAll('.msb').forEach(x => x.classList.remove('active'));
+// Sub-tabs (Tab 1)
+document.querySelectorAll('.stab2').forEach(t=>{
+  t.addEventListener('click',()=>{
+    document.querySelectorAll('.stab2').forEach(x=>x.classList.remove('active'));
+    document.querySelectorAll('.subpanel').forEach(x=>x.classList.remove('active'));
+    t.classList.add('active');
+    el(t.dataset.sub).classList.add('active');
+  });
+});
+
+// Scenario tabs
+document.querySelectorAll('.scen-pill').forEach(t=>{
+  t.addEventListener('click',()=>{
+    document.querySelectorAll('.scen-pill').forEach(x=>x.classList.remove('active'));
+    document.querySelectorAll('.scen-panel').forEach(x=>x.classList.remove('active'));
+    t.classList.add('active');
+    el('scen-'+t.dataset.scen).classList.add('active');
+  });
+});
+
+// Price type
+document.querySelectorAll('#prix-type-pills .tpill').forEach(t=>{
+  t.addEventListener('click',()=>{
+    document.querySelectorAll('#prix-type-pills .tpill').forEach(x=>x.classList.remove('active'));
+    t.classList.add('active');
+    S.priceType = t.dataset.type;
+    document.querySelectorAll('.prix-panel').forEach(p=>p.classList.add('hidden'));
+    el('prix-'+S.priceType).classList.remove('hidden');
+  });
+});
+
+// PV mode
+document.querySelectorAll('#pv-mode-pills .tpill').forEach(t=>{
+  t.addEventListener('click',()=>{
+    document.querySelectorAll('#pv-mode-pills .tpill').forEach(x=>x.classList.remove('active'));
+    t.classList.add('active');
+    S.pvMode = t.dataset.pvmode;
+    document.querySelectorAll('.pv-mode-panel').forEach(p=>p.classList.add('hidden'));
+    el('pv-'+S.pvMode).classList.remove('hidden');
+    if(S.pvMode==='none'){S.pvSlots=[];updateBadge();}
+  });
+});
+
+// Financial model
+document.querySelectorAll('.msb').forEach(b=>{
+  b.addEventListener('click',()=>{
+    document.querySelectorAll('.msb').forEach(x=>x.classList.remove('active'));
     b.classList.add('active');
     S.finModel = b.dataset.model;
-    el('fin-tiers-card').classList.toggle('hidden', S.finModel !== 'tiers');
-    el('fin-leasing-card').classList.toggle('hidden', S.finModel !== 'leasing');
+    el('fin-tiers-card').classList.toggle('hidden',S.finModel!=='tiers');
+    el('fin-leasing-card').classList.toggle('hidden',S.finModel!=='leasing');
   });
 });
 
-// Share display sync
-el('fin-wgi-share').addEventListener('input', () => {
-  el('fin-client-share-disp').value = 100 - (parseFloat(el('fin-wgi-share').value)||0);
-});
-el('fin-debt-ratio').addEventListener('input', () => {
-  el('fin-equity-disp').value = 100 - (parseFloat(el('fin-debt-ratio').value)||0);
-  updateCapexRecap();
-});
+// Share sync
+el('fin-wgi-share').addEventListener('input',()=>el('fin-client-disp').value=100-(parseFloat(el('fin-wgi-share').value)||0));
+el('fin-debt-ratio').addEventListener('input',()=>{el('fin-equity-disp').value=100-(parseFloat(el('fin-debt-ratio').value)||0);updateCapex();});
+['fin-capex-batt','fin-capex-install','fin-capex-recycle','fin-capex-subsidy','fin-debt-ratio','fin-loan-rate','fin-loan-years'].forEach(id=>el(id).addEventListener('input',updateCapex));
+['p-hp-start','p-hp-end'].forEach(id=>el(id).addEventListener('input',()=>el('hp-disp').textContent=(el('p-hp-start').value||7)+'h à '+(el('p-hp-end').value||22)+'h'));
 
-// HP display
-function updateHPDisplay() {
-  el('hp-display').textContent = (el('hp-start').value||7)+'h à '+(el('hp-end').value||22)+'h';
+function updateCapex(){
+  const brut=(parseFloat(el('fin-capex-batt').value)||0)+(parseFloat(el('fin-capex-install').value)||0)+(parseFloat(el('fin-capex-recycle').value)||0);
+  const net=brut-(parseFloat(el('fin-capex-subsidy').value)||0);
+  const dr=(parseFloat(el('fin-debt-ratio').value)||70)/100;
+  const equity=net*(1-dr),debt=net*dr;
+  const lr=(parseFloat(el('fin-loan-rate').value)||4.5)/100,ly=parseInt(el('fin-loan-years').value)||7;
+  const ann=debt>0?pmt(lr,ly,debt):0;
+  el('capex-net-disp').textContent=fE(net,0);
+  el('r-capex-brut').textContent=fE(brut,0);
+  el('r-capex-net').textContent=fE(net,0);
+  el('r-equity').textContent=fE(equity,0);
+  el('r-annuity').textContent=fE(ann,0)+'/an';
 }
-el('hp-start').addEventListener('input', updateHPDisplay);
-el('hp-end').addEventListener('input', updateHPDisplay);
+updateCapex();
 
-// CAPEX auto-update
-['fin-capex-batt','fin-capex-install','fin-capex-recycle','fin-capex-subsidy','fin-debt-ratio','fin-loan-rate','fin-loan-years'].forEach(id => {
-  el(id).addEventListener('input', updateCapexRecap);
-});
-
-function updateCapexRecap() {
-  const brut = (parseFloat(el('fin-capex-batt').value)||0) + (parseFloat(el('fin-capex-install').value)||0) + (parseFloat(el('fin-capex-recycle').value)||0);
-  const net  = brut - (parseFloat(el('fin-capex-subsidy').value)||0);
-  const dr   = (parseFloat(el('fin-debt-ratio').value)||70)/100;
-  const equity = net * (1 - dr);
-  const debt   = net * dr;
-  const lr     = (parseFloat(el('fin-loan-rate').value)||4.5)/100;
-  const ly     = parseInt(el('fin-loan-years').value)||7;
-  const annuity = debt > 0 ? pmt(lr, ly, debt) : 0;
-
-  el('capex-net-display').textContent = fE(net, 0);
-  el('r-capex-brut').textContent = fE(brut, 0);
-  el('r-capex-net').textContent  = fE(net, 0);
-  el('r-equity').textContent     = fE(equity, 0);
-  el('r-debt').textContent       = fE(debt, 0);
-  el('r-annuity').textContent    = fE(annuity, 0) + '/an';
-}
-updateCapexRecap();
-
-// ═══════════════════════════════════════════════════════════
-// DATA PARSING
-// ═══════════════════════════════════════════════════════════
-function detectSep(text) {
-  const firstLine = text.split('\n')[0];
-  const counts = {';': (firstLine.match(/;/g)||[]).length, ',': (firstLine.match(/,/g)||[]).length, '\t': (firstLine.match(/\t/g)||[]).length};
-  return Object.entries(counts).sort((a,b)=>b[1]-a[1])[0][0];
+// ═══════════════════════ CITY & ORIENT UI ═══════════════════════
+function buildCityGrid(){
+  const cg=el('city-grid');
+  Object.entries(CITIES).forEach(([name,city])=>{
+    const b=document.createElement('button');
+    b.className='city-btn'+(name===S.selectedCity?' active':'');
+    b.innerHTML=`${name}<span class="city-ghi">${city.annual} kWh/m²/an</span>`;
+    b.onclick=()=>{
+      document.querySelectorAll('.city-btn').forEach(x=>x.classList.remove('active'));
+      b.classList.add('active');
+      S.selectedCity=name;
+    };
+    cg.appendChild(b);
+  });
 }
 
-function parseDateTime(s) {
-  if (!s) return null;
-  s = String(s).trim();
-  // ISO: 2023-01-01T00:15
-  let m = s.match(/^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2})/);
-  if (m) return new Date(+m[1],+m[2]-1,+m[3],+m[4],+m[5]);
-  // Belgian: 01/01/2023 00:15 or 01/01/2023 0:15
-  m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})[T ,]+(\d{1,2}):(\d{2})/);
-  if (m) return new Date(+m[3],+m[2]-1,+m[1],+m[4],+m[5]);
-  // Date only + separate time column handled in caller
+function buildOrientGrid(){
+  const og=el('orient-grid');
+  ORIENTATIONS.forEach((o,i)=>{
+    const b=document.createElement('button');
+    b.className='orient-btn'+(i===0?' active':'');
+    b.innerHTML=`${o.label}<div style="font-size:.6rem;color:var(--g400);margin-top:1px">${(o.factor*100).toFixed(0)}%</div>`;
+    b.onclick=()=>{
+      document.querySelectorAll('.orient-btn').forEach(x=>x.classList.remove('active'));
+      b.classList.add('active');
+      S.selectedOrient=i;
+    };
+    og.appendChild(b);
+  });
+}
+buildCityGrid();
+buildOrientGrid();
+
+// ═══════════════════════ SOLAR PV SIMULATION ═══════════════════════
+function generatePV(){
+  const kWc=parseFloat(el('pv-kwc').value)||100;
+  const pr=parseFloat(el('pv-pr').value)||0.82;
+  const tilt=parseFloat(el('pv-tilt').value)||35;
+  const year=parseInt(el('pv-year').value)||2023;
+  const city=CITIES[S.selectedCity];
+  const orient=ORIENTATIONS[S.selectedOrient];
+
+  const prog=el('prog-pv');
+  prog.classList.add('visible');
+  el('fill-pv').style.width='10%';
+  el('lbl-pv').textContent='Calcul des angles solaires...';
+
+  setTimeout(()=>{
+    const slots=generateSolarProfile(year,kWc,pr,tilt,orient.deg,city);
+    el('fill-pv').style.width='80%';
+    el('lbl-pv').textContent='Génération du profil...';
+    setTimeout(()=>{
+      S.pvSlots=slots;
+      const totalPV=slots.reduce((a,b)=>a+b.pv,0)*0.25/1000;
+      const peakPV=Math.max(...slots.map(s=>s.pv));
+      el('stats-pv').innerHTML=`
+        <div class="chip orange"><div class="chip-l">Production totale</div><div class="chip-v">${fmt(totalPV,1)} MWh/an</div></div>
+        <div class="chip orange"><div class="chip-l">Puissance max.</div><div class="chip-v">${fmt(peakPV,1)} kW</div></div>
+        <div class="chip orange"><div class="chip-l">Production spécifique</div><div class="chip-v">${fmt(totalPV*1000/kWc,0)} kWh/kWc</div></div>
+        <div class="chip orange"><div class="chip-l">Ville</div><div class="chip-v">${S.selectedCity}</div></div>
+      `;
+      el('pv-annual-prod-badge').textContent=`→ ${fmt(totalPV,1)} MWh/an simulés`;
+      el('fill-pv').style.width='100%';
+      el('lbl-pv').textContent=`✓ ${fmt(slots.length)} quarts d'heure générés`;
+      updateBadge();
+      renderPVPreview(slots);
+    },30);
+  },50);
+}
+
+function generateSolarProfile(year,kWc,pr,tiltDeg,orientDeg,city){
+  const tiltRad=tiltDeg*Math.PI/180;
+  const orientRad=orientDeg*Math.PI/180;
+  const latRad=city.lat*Math.PI/180;
+  const daysInMonth=[31,isLeap(year)?29:28,31,30,31,30,31,31,30,31,30,31];
+  const slots=[];
+  let doy=0;
+
+  for(let m=0;m<12;m++){
+    const targetDailyWh=city.ghi[m]*1000; // Wh/m²/day on tilted surface (approx)
+    for(let d=0;d<daysInMonth[m];d++){
+      doy++;
+      const dec=23.45*Math.sin(2*Math.PI*(doy-81)/365)*Math.PI/180;
+      // Clear-sky profile
+      const cs=[];let csSum=0;
+      for(let sl=0;sl<96;sl++){
+        const tLocal=sl*0.25;
+        const B=2*Math.PI*(doy-81)/364;
+        const EoT=(9.87*Math.sin(2*B)-7.53*Math.cos(B)-1.5*Math.sin(B))/60;
+        const TST=tLocal+(city.lng-15)/15+EoT;
+        const ha=(TST-12)*15*Math.PI/180;
+        const sinAlt=Math.sin(latRad)*Math.sin(dec)+Math.cos(latRad)*Math.cos(dec)*Math.cos(ha);
+        let ghi=0;
+        if(sinAlt>0.01){
+          const alt=Math.asin(sinAlt);
+          const AM=1/(sinAlt+0.50572*Math.pow(alt*180/Math.PI+6.07995,-1.6364));
+          const Et=1353*(1+0.033*Math.cos(2*Math.PI*doy/365));
+          const Ib=Et*Math.pow(0.7,Math.pow(AM,0.678));
+          const Id=0.1*Et*sinAlt;
+          const ghiH=(Ib+Id)*sinAlt;
+          // Incidence on tilted surface
+          const cosAz=ha<0?1:-1;
+          const sunAz=ha<0?-Math.acos(Math.max(-1,Math.min(1,(Math.sin(dec)*Math.cos(latRad)-Math.cos(dec)*Math.sin(latRad)*Math.cos(ha))/Math.cos(alt)))):Math.acos(Math.max(-1,Math.min(1,(Math.sin(dec)*Math.cos(latRad)-Math.cos(dec)*Math.sin(latRad)*Math.cos(ha))/Math.cos(alt))));
+          const cosTheta=sinAlt*Math.cos(tiltRad)+Math.cos(alt)*Math.sin(tiltRad)*Math.cos(sunAz-orientRad);
+          ghi=Math.max(0,ghiH*cosTheta/sinAlt);
+        }
+        cs.push(ghi);csSum+=ghi*0.25;
+      }
+      // Scale to monthly target + daily cloud variability (deterministic)
+      const scale=csSum>0?targetDailyWh/csSum:0;
+      const seed=(doy*137+year*13)%100/100;
+      const cloudF=0.65+0.5*seed; // 0.65–1.15, realistic Belgian variability
+      for(let sl=0;sl<96;sl++){
+        const irr=Math.max(0,cs[sl]*scale*cloudF);
+        const pvKw=irr/1000*kWc*pr;
+        const ts=new Date(year,m,d+1,Math.floor(sl/4),(sl%4)*15);
+        slots.push({ts,pv:Math.max(0,pvKw)});
+      }
+    }
+  }
+  return slots;
+}
+
+function isLeap(y){return(y%4===0&&y%100!==0)||y%400===0;}
+
+let pvPreviewChart=null;
+function renderPVPreview(slots){
+  const ctx=el('chart-pv-preview').getContext('2d');
+  if(pvPreviewChart)pvPreviewChart.destroy();
+  // Monthly production totals
+  const months=['Jan','Fév','Mar','Avr','Mai','Jun','Jul','Aoû','Sep','Oct','Nov','Déc'];
+  const monthly=Array(12).fill(0);
+  slots.forEach(s=>{if(s.ts)monthly[s.ts.getMonth()]+=s.pv*0.25/1000;});
+  pvPreviewChart=new Chart(ctx,{
+    type:'bar',data:{labels:months,datasets:[{label:'Production PV (MWh/mois)',data:monthly,backgroundColor:'rgba(249,115,22,.7)',borderRadius:4}]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{ticks:{font:{family:'DM Mono',size:8}}},y:{ticks:{font:{family:'DM Mono',size:8},callback:v=>fmt(v,0)},title:{display:true,text:'MWh',font:{size:9}}}}}
+  });
+}
+
+// ═══════════════════════ DATA PARSING ═══════════════════════
+function detectSep(text){
+  const l=text.split('\n')[0];
+  const c={';':(l.match(/;/g)||[]).length,',':(l.match(/,/g)||[]).length,'\t':(l.match(/\t/g)||[]).length};
+  return Object.entries(c).sort((a,b)=>b[1]-a[1])[0][0];
+}
+function parseDT(s){
+  if(!s)return null;s=String(s).trim();
+  let m=s.match(/^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2})/);
+  if(m)return new Date(+m[1],+m[2]-1,+m[3],+m[4],+m[5]);
+  m=s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})[T ,]+(\d{1,2}):(\d{2})/);
+  if(m)return new Date(+m[3],+m[2]-1,+m[1],+m[4],+m[5]);
   return null;
 }
+function pf(s){return parseFloat((s||'').replace(',','.'))||0;}
 
-function parseData() {
-  const raw = el('paste-data').value.trim();
-  if (!raw) { alert('Collez des données dans la zone de texte.'); return; }
-
-  const prog = el('parse-progress');
-  prog.classList.add('visible');
-  el('parse-fill').style.width = '20%';
-  el('parse-label').textContent = 'Détection du séparateur...';
-
-  setTimeout(() => {
-    const sep = detectSep(raw);
-    const lines = raw.split('\n').map(l => l.trim()).filter(l => l);
-    const headers = lines[0].split(sep).map(h => h.trim().replace(/['"]/g,''));
-
-    el('parse-fill').style.width = '50%';
-    el('parse-label').textContent = `${lines.length-1} lignes détectées, ${headers.length} colonnes...`;
-
-    // Render column mapping
-    const mapGrid = el('colmap-grid');
-    mapGrid.innerHTML = '';
-    const roles = ['Ignorer','Timestamp','Consommation (kW ou kWh)','Production PV (kW ou kWh)','Injection réseau (kW ou kWh)','Prix Spot (€/MWh)'];
-    
-    // Auto-detect columns
-    const autoMap = {};
-    headers.forEach((h, i) => {
-      const hl = h.toLowerCase();
-      if (hl.includes('timestamp') || hl.includes('datum') || hl.includes('date') || hl.includes('tijd')) autoMap[i] = 'ts';
-      else if (hl.includes('afname') || hl.includes('conso') || hl.includes('offtake') || hl.includes('kwh') && !hl.includes('inject') && !hl.includes('pv')) autoMap[i] = 'cons';
-      else if (hl.includes('inject') || hl.includes('injectie')) autoMap[i] = 'inj';
-      else if (hl.includes('pv') || hl.includes('solaire') || hl.includes('productie') || hl.includes('produc')) autoMap[i] = 'pv';
-      else if (hl.includes('price') || hl.includes('prix') || hl.includes('spot')) autoMap[i] = 'price';
-    });
-
-    headers.forEach((h, i) => {
-      const div = document.createElement('div');
-      div.className = 'colmap-item';
-      const defaultVal = (() => {
-        if (autoMap[i] === 'ts') return 'ts';
-        if (autoMap[i] === 'cons') return 'cons';
-        if (autoMap[i] === 'inj') return 'inj';
-        if (autoMap[i] === 'pv') return 'pv';
-        if (autoMap[i] === 'price') return 'price';
-        return '';
-      })();
-      div.innerHTML = `
-        <div class="colmap-name" title="${h}">Col ${i+1}: ${h}</div>
-        <select data-col="${i}" style="width:100%;font-size:.72rem;padding:4px 6px">
-          <option value="">— Ignorer —</option>
-          <option value="ts" ${defaultVal==='ts'?'selected':''}>🕐 Timestamp</option>
-          <option value="cons" ${defaultVal==='cons'?'selected':''}>⚡ Consommation</option>
-          <option value="pv" ${defaultVal==='pv'?'selected':''}>☀️ Production PV</option>
-          <option value="inj" ${defaultVal==='inj'?'selected':''}>↗️ Injection réseau</option>
-          <option value="price" ${defaultVal==='price'?'selected':''}>💶 Prix Spot €/MWh</option>
-        </select>`;
-      mapGrid.appendChild(div);
-    });
-
-    // Preview
-    const previewDiv = el('data-preview');
-    const sampleLines = lines.slice(1, 6);
-    let previewHTML = '<table><thead><tr>' + headers.map(h=>`<th>${h}</th>`).join('') + '</tr></thead><tbody>';
-    sampleLines.forEach(l => {
-      const cells = l.split(sep);
-      previewHTML += '<tr>' + cells.map(c=>`<td>${c}</td>`).join('') + '</tr>';
-    });
-    previewHTML += '</tbody></table>';
-    previewDiv.innerHTML = previewHTML;
-
-    el('colmap-card').classList.add('visible');
-    el('colmap-card').style.display = 'block';
-    el('parse-fill').style.width = '100%';
-    el('parse-label').textContent = `✓ ${lines.length-1} lignes analysées. Vérifiez la correspondance des colonnes.`;
-
-    // Store raw for later
-    S._rawLines = lines;
-    S._rawSep = sep;
-    S._rawHeaders = headers;
-    el('badge-data').textContent = fmt(lines.length-1, 0) + ' pts';
-  }, 50);
+function detectGRDFormat(lines) {
+  // Check if line 4 (index 3) contains role codes like B_A-, M_A-, B_A+, M_A+
+  if (lines.length < 6) return false;
+  const roleLine = lines[3].toLowerCase();
+  return roleLine.includes('m_a+') || roleLine.includes('b_a+') || roleLine.includes('m_a-');
 }
 
-function confirmMapping() {
-  const selects = el('colmap-grid').querySelectorAll('select');
-  const map = {};
-  selects.forEach(s => { if (s.value) map[s.value] = +s.dataset.col; });
+function parseConsoGRD(lines, sep) {
+  // Find column indices from role line (row index 3)
+  const roleRow = lines[3].split(sep).map(c => c.trim().replace(/['"]/g, '').toLowerCase());
+  const colMA_plus = roleRow.findIndex(c => c === 'm_a+');  // measured consumption
+  const colMA_minus = roleRow.findIndex(c => c === 'm_a-'); // measured injection
+  // Fallback: billed if measured not found
+  const colCons = colMA_plus >= 0 ? colMA_plus : roleRow.findIndex(c => c === 'b_a+');
+  const colInj  = colMA_minus >= 0 ? colMA_minus : roleRow.findIndex(c => c === 'b_a-');
 
-  if (!map.ts && !map.cons) { alert('Veuillez au minimum mapper Timestamp et Consommation.'); return; }
+  if (colCons < 0) return null;
 
-  const sep = S._rawSep;
-  const lines = S._rawLines;
+  // Data starts at line 5 (index 5)
   const slots = [];
+  for (let i = 5; i < lines.length; i++) {
+    const cells = lines[i].split(sep).map(c => c.trim().replace(/['"]/g, ''));
+    if (!cells[0] || cells[0].length < 8) continue;
+    const ts = parseDT(cells[0]);
+    const cons = pf(cells[colCons]);
+    const inj  = colInj >= 0 ? pf(cells[colInj]) : 0;
+    slots.push({ ts, cons, inj });
+  }
+  return { slots, colCons, colInj, format: 'GRD belge (M_A+ / M_A-)' };
+}
 
+function parseConso(){
+  const raw = el('paste-conso').value.trim();
+  if (!raw) { alert('Collez des données.'); return; }
+  const sep = detectSep(raw);
+  const lines = raw.split('\n').map(l => l.trim()).filter(l => l);
+
+  // ── GRD FORMAT AUTO-DETECT ──
+  if (detectGRDFormat(lines)) {
+    el('prog-conso').classList.add('visible');
+    el('fill-conso').style.width = '40%';
+    el('lbl-conso').textContent = '✓ Format GRD belge détecté — extraction M_A+ (conso) et M_A- (injection)...';
+    setTimeout(() => {
+      const result = parseConsoGRD(lines, sep);
+      if (!result) { alert('Format GRD détecté mais colonnes M_A+ introuvables.'); return; }
+      const { slots, format } = result;
+      S.conso = slots;
+      const totalC = slots.reduce((a,b) => a + b.cons, 0) * 0.25 / 1000;
+      const totalI = slots.reduce((a,b) => a + b.inj, 0) * 0.25 / 1000;
+      const maxPk  = Math.max(...slots.map(s => s.cons));
+      const minDate = slots.find(s=>s.ts)?.ts;
+      const maxDate = [...slots].reverse().find(s=>s.ts)?.ts;
+      const period  = minDate && maxDate ? `${minDate.toLocaleDateString('fr-BE')} → ${maxDate.toLocaleDateString('fr-BE')}` : '—';
+      el('stats-conso').innerHTML = `
+        <div class="chip"><div class="chip-l">Format</div><div class="chip-v" style="font-size:.7rem">${format}</div></div>
+        <div class="chip"><div class="chip-l">Points 15 min</div><div class="chip-v">${fmt(slots.length)}</div></div>
+        <div class="chip green"><div class="chip-l">Conso totale</div><div class="chip-v">${fmt(totalC, 1)} MWh</div></div>
+        <div class="chip"><div class="chip-l">Injection totale</div><div class="chip-v">${fmt(totalI, 1)} MWh</div></div>
+        <div class="chip"><div class="chip-l">Pic max</div><div class="chip-v">${fmt(maxPk, 0)} kW</div></div>
+        <div class="chip"><div class="chip-l">Période</div><div class="chip-v" style="font-size:.68rem">${period}</div></div>
+      `;
+      el('colmap-conso-card').classList.remove('hidden');
+      el('colmap-conso-grid').innerHTML = `<div class="ib ok" style="grid-column:1/-1">✓ Extraction automatique réussie — colonnes M_A+ (consommation) et M_A- (injection) identifiées. Cliquez "Confirmer" pour valider.</div>`;
+      el('fill-conso').style.width = '100%';
+      el('lbl-conso').textContent = `✓ ${fmt(slots.length)} quarts d'heure extraits · Format GRD belge`;
+      document.querySelector('.stab2[data-sub="s-conso"]').classList.add('ready');
+      updateBadge();
+    }, 50);
+    return;
+  }
+
+  // ── FORMAT LIBRE ──
+  const headers = lines[0].split(sep).map(h => h.trim().replace(/['"]/g,''));
+  const autoMap = {};
+  headers.forEach((h, i) => {
+    const hl = h.toLowerCase();
+    if (hl.includes('timestamp')||hl.includes('datum')||hl.includes('date')||hl.includes('tijd')) autoMap[i]='ts';
+    else if ((hl.includes('afname')||hl.includes('conso')||hl.includes('offtake')||hl.includes('a+'))&&!autoMap[i]) autoMap[i]='cons';
+    else if (hl.includes('inject')||hl.includes('injectie')||hl.includes('a-')) autoMap[i]='inj';
+  });
+
+  const mapGrid = el('colmap-conso-grid'); mapGrid.innerHTML = '';
+  headers.forEach((h, i) => {
+    const def = autoMap[i]||'';
+    const d = document.createElement('div'); d.className = 'colmap-item';
+    d.innerHTML = `<div class="colmap-name" title="${h}">Col ${i+1}: ${h}</div><select data-col="${i}" style="width:100%;font-size:.7rem;padding:3px 6px"><option value="">— Ignorer —</option><option value="ts" ${def==='ts'?'selected':''}>🕐 Timestamp</option><option value="cons" ${def==='cons'?'selected':''}>⚡ Consommation</option><option value="inj" ${def==='inj'?'selected':''}>↗️ Injection</option></select>`;
+    mapGrid.appendChild(d);
+  });
+
+  const pr = el('preview-conso');
+  pr.innerHTML = '<table><thead><tr>'+headers.map(h=>`<th>${h}</th>`).join('')+'</tr></thead><tbody>'+
+    lines.slice(1,5).map(l=>'<tr>'+l.split(sep).map(c=>`<td>${c}</td>`).join('')+'</tr>').join('')+'</tbody></table>';
+
+  el('colmap-conso-card').classList.remove('hidden');
+  S._consoRaw = { lines, sep, headers };
+  el('fill-conso').style.width = '100%';
+  el('lbl-conso').textContent = `${lines.length-1} lignes détectées — vérifiez le mapping`;
+  el('prog-conso').classList.add('visible');
+}
+
+function confirmConso(){
+  // If already parsed by GRD auto-detect, S.conso is already set
+  if (S.conso && el('colmap-conso-grid').querySelector('.ib.ok')) {
+    document.querySelector('.stab2[data-sub="s-conso"]').classList.add('ready');
+    updateBadge();
+    alert(`✓ ${fmt(S.conso.length)} quarts d'heure confirmés (format GRD belge).`);
+    return;
+  }
+  // Free format path
+  const selects = el('colmap-conso-grid').querySelectorAll('select');
+  const map = {}; selects.forEach(s => { if (s.value) map[s.value] = +s.dataset.col; });
+  if (!map.cons) { alert('Mappez au moins la consommation.'); return; }
+  const { lines, sep } = S._consoRaw;
+  const slots = [];
   for (let i = 1; i < lines.length; i++) {
     const cells = lines[i].split(sep).map(c => c.trim().replace(/['"]/g,''));
-    const tsStr = map.ts !== undefined ? cells[map.ts] : null;
-    const dt = tsStr ? parseDateTime(tsStr) : null;
-    const cons = parseFloat((cells[map.cons]||'').replace(',','.')) || 0;
-    const pv   = map.pv !== undefined ? parseFloat((cells[map.pv]||'').replace(',','.')) || 0 : 0;
-    const inj  = map.inj !== undefined ? parseFloat((cells[map.inj]||'').replace(',','.')) || 0 : 0;
-    const price = map.price !== undefined ? parseFloat((cells[map.price]||'').replace(',','.')) || null : null;
-
-    slots.push({ ts: dt, cons, pv, inj, price });
+    const ts = map.ts !== undefined ? parseDT(cells[map.ts]) : null;
+    const cons = pf(cells[map.cons]);
+    const inj  = map.inj !== undefined ? pf(cells[map.inj]) : 0;
+    slots.push({ ts, cons, inj });
   }
-
-  // Detect unit: kWh/15min vs kW (if values are very small, likely kWh → convert to kW)
-  const avgCons = slots.reduce((a,b)=>a+b.cons,0)/slots.length;
-  const unitFactor = avgCons < 5 ? 4 : 1; // if avg < 5 kWh/15min, assume kWh → ×4 for kW
-  if (unitFactor === 4) {
-    slots.forEach(s => { s.cons *= 4; s.pv *= 4; s.inj *= 4; });
-  }
-
-  S.rawSlots = slots;
-  S.colMap = map;
-
-  // Stats
-  const totalCons = slots.reduce((a,b)=>a+b.cons,0) * 0.25; // kWh
-  const totalPV   = slots.reduce((a,b)=>a+b.pv,0) * 0.25;
-  const maxPeak   = Math.max(...slots.map(s=>s.cons));
-  const hasPrice  = slots.some(s=>s.price!==null);
-
-  el('data-stats').innerHTML = `
-    <div class="chip"><div class="chip-l">Nb quarts d'heure</div><div class="chip-v">${fmt(slots.length)}</div></div>
-    <div class="chip"><div class="chip-l">Conso totale</div><div class="chip-v">${fmt(totalCons/1000,1)} MWh</div></div>
-    <div class="chip"><div class="chip-l">Production PV</div><div class="chip-v">${fmt(totalPV/1000,1)} MWh</div></div>
-    <div class="chip"><div class="chip-l">Pic max</div><div class="chip-v">${fmt(maxPeak,0)} kW</div></div>
-    <div class="chip"><div class="chip-l">Prix spot</div><div class="chip-v">${hasPrice?'✓ Disponible':'Non fourni'}</div></div>
-    <div class="chip"><div class="chip-l">Unité détectée</div><div class="chip-v">${unitFactor===4?'kWh/15min':'kW'}</div></div>
+  // Detect unit (kWh/15min → multiply by 4 for kW)
+  const avg = slots.reduce((a,b) => a+b.cons, 0) / slots.length;
+  if (avg < 5) slots.forEach(s => { s.cons *= 4; s.inj *= 4; });
+  S.conso = slots;
+  const totalC = slots.reduce((a,b) => a+b.cons, 0) * 0.25 / 1000;
+  const maxPk  = Math.max(...slots.map(s => s.cons));
+  el('stats-conso').innerHTML = `
+    <div class="chip"><div class="chip-l">Points</div><div class="chip-v">${fmt(slots.length)}</div></div>
+    <div class="chip green"><div class="chip-l">Conso totale</div><div class="chip-v">${fmt(totalC, 1)} MWh</div></div>
+    <div class="chip"><div class="chip-l">Pic max</div><div class="chip-v">${fmt(maxPk, 0)} kW</div></div>
   `;
-
-  alert(`✓ ${slots.length} quarts d'heure importés. Passez à l'onglet "Batterie & Site" pour configurer la simulation.`);
+  document.querySelector('.stab2[data-sub="s-conso"]').classList.add('ready');
+  updateBadge();
 }
 
-function clearData() {
-  el('paste-data').value = '';
-  el('colmap-card').style.display = 'none';
-  S.rawSlots = null;
-  el('badge-data').textContent = '—';
-}
-
-// ═══════════════════════════════════════════════════════════
-// SAMPLE DATA GENERATOR
-// ═══════════════════════════════════════════════════════════
-function loadSampleData() {
-  // Generate 1 week of synthetic 15-min data
-  const lines = ['Timestamp;Consommation [kW];Production PV [kW]'];
-  const start = new Date(2023, 0, 1, 0, 0);
-  for (let i = 0; i < 35040; i++) {
-    const d = new Date(start.getTime() + i * 15 * 60000);
-    const h = d.getHours() + d.getMinutes()/60;
-    const dow = d.getDay();
-    const month = d.getMonth();
-    // Consumption: industrial profile
-    const base = dow === 0 || dow === 6 ? 60 : 120;
-    const shift = dow > 0 && dow < 6 ? (h > 6 && h < 22 ? 80 + 40*Math.sin((h-7)/15*Math.PI) : 20) : 30;
-    const cons = base + shift + (Math.random()-0.5)*20;
-    // PV: seasonal + daily
-    const sunH = h - 4.5;
-    const dayLen = 8 + 4*Math.sin((month-2)/6*Math.PI);
-    const pvBase = sunH > 0 && sunH < dayLen ? Math.sin(sunH/dayLen*Math.PI) * (50 + 20*Math.sin((month-2)/6*Math.PI)) : 0;
-    const pv = Math.max(0, pvBase + (Math.random()-0.5)*5);
-    const dd = String(d.getDate()).padStart(2,'0');
-    const mm = String(d.getMonth()+1).padStart(2,'0');
-    const hh = String(d.getHours()).padStart(2,'0');
-    const mi = String(d.getMinutes()).padStart(2,'0');
-    lines.push(`${dd}/${mm}/${d.getFullYear()} ${hh}:${mi};${cons.toFixed(2)};${pv.toFixed(2)}`);
-    if (lines.length > 3000) break; // limit for demo
+function parseSpot(){
+  const raw=el('paste-spot').value.trim();
+  if(!raw){alert('Collez des données de prix spot.');return;}
+  const sep=detectSep(raw);
+  const lines=raw.split('\n').map(l=>l.trim()).filter(l=>l).slice(1); // skip header
+  const slots=[];
+  for(const line of lines){
+    const cells=line.split(sep);
+    if(cells.length<2)continue;
+    const ts=parseDT(cells[0]);
+    const price=pf(cells[1]);
+    if(ts&&!isNaN(price))slots.push({ts,price});
   }
-  el('paste-data').value = lines.slice(0, 1000).join('\n');
-  alert('Données exemple chargées (1000 points). Cliquez "Analyser" pour continuer.');
+  // If hourly, interpolate to 15-min
+  const isHourly=slots.length>0&&slots.length<8800;
+  const result=isHourly?interpolateToQuarters(slots):slots;
+  S.spotPrices=result;
+  const avgP=result.reduce((a,b)=>a+b.price,0)/result.length;
+  const minP=Math.min(...result.map(s=>s.price));
+  const maxP=Math.max(...result.map(s=>s.price));
+  el('stats-spot').innerHTML=`<div class="chip"><div class="chip-l">Points</div><div class="chip-v">${fmt(result.length)}</div></div><div class="chip green"><div class="chip-l">Prix moyen</div><div class="chip-v">${fmt(avgP,1)} €/MWh</div></div><div class="chip"><div class="chip-l">Min/Max</div><div class="chip-v">${fmt(minP,0)}-${fmt(maxP,0)}</div></div>`;
+  el('fill-spot').style.width='100%';el('lbl-spot').textContent=`✓ ${fmt(result.length)} prix chargés${isHourly?' (interpolés de horaire → 15min)':''}`;
+  el('prog-spot').classList.add('visible');
+  document.querySelector('.stab2[data-sub="s-prix"]').classList.add('ready');
+  updateBadge();
 }
 
-// ═══════════════════════════════════════════════════════════
-// HELPERS
-// ═══════════════════════════════════════════════════════════
-function pmt(r, n, pv) { return r===0 ? pv/n : pv*r*Math.pow(1+r,n)/(Math.pow(1+r,n)-1); }
-function irr(equity, cfs) {
-  const f = r => { let s=-equity; cfs.forEach((c,i)=>s+=c/Math.pow(1+r,i+1)); return s; };
-  if (f(50) <= 0) return null;
-  let lo=-0.99, hi=50;
-  for(let i=0;i<300;i++){const m=(lo+hi)/2; f(m)>0?hi=m:lo=m; if(hi-lo<1e-8)break;}
+function interpolateToQuarters(hourlySlots){
+  const result=[];
+  for(let i=0;i<hourlySlots.length;i++){
+    const {ts,price}=hourlySlots[i];
+    const nextPrice=i+1<hourlySlots.length?hourlySlots[i+1].price:price;
+    for(let q=0;q<4;q++){
+      const t=new Date(ts.getTime()+q*15*60000);
+      const p=price+(nextPrice-price)*q/4;
+      result.push({ts:t,price:p});
+    }
+  }
+  return result;
+}
+
+function parsePVData(){
+  const raw=el('paste-pv-data').value.trim();
+  if(!raw)return;
+  const sep=detectSep(raw);
+  const lines=raw.split('\n').map(l=>l.trim()).filter(l=>l).slice(1);
+  const slots=[];
+  for(const line of lines){
+    const cells=line.split(sep);
+    if(cells.length<2)continue;
+    const ts=parseDT(cells[0]);
+    const pv=pf(cells[1]);
+    slots.push({ts,pv});
+  }
+  const avg=slots.reduce((a,b)=>a+b.pv,0)/slots.length;
+  if(avg<5)slots.forEach(s=>s.pv*=4);
+  S.pvSlots=slots;
+  const total=slots.reduce((a,b)=>a+b.pv,0)*0.25/1000;
+  el('stats-pv-paste').innerHTML=`<div class="chip orange"><div class="chip-l">Production totale</div><div class="chip-v">${fmt(total,1)} MWh/an</div></div><div class="chip orange"><div class="chip-l">Points</div><div class="chip-v">${fmt(slots.length)}</div></div>`;
+  updateBadge();
+}
+
+function updateBadge(){
+  const n=[S.conso?1:0,(S.pvSlots||S.pvMode==='none')?1:0,(S.priceType!=='spot'||S.spotPrices)?1:0].reduce((a,b)=>a+b,0);
+  el('badge-data').textContent=n+'/3';
+  updateRecap();
+}
+
+function loadSampleConso(){
+  const lines=['Timestamp;Consommation [kWh];Injection [kWh]'];
+  const base=new Date(2023,0,1,0,15);
+  for(let i=0;i<35040;i++){
+    const d=new Date(base.getTime()+i*15*60000);
+    const h=d.getHours()+d.getMinutes()/60,dow=d.getDay();
+    const isWD=dow>0&&dow<6;
+    const cons=isWD?(h>7&&h<22?80+30*Math.sin((h-7)/15*Math.PI)+Math.random()*15:20+Math.random()*8):30+Math.random()*15;
+    const dd=String(d.getDate()).padStart(2,'0'),mm=String(d.getMonth()+1).padStart(2,'0');
+    const hh=String(d.getHours()).padStart(2,'0'),mi=String(d.getMinutes()).padStart(2,'0');
+    lines.push(`${dd}/${mm}/${d.getFullYear()} ${hh}:${mi};${(cons/4).toFixed(3)};0.000`);
+    if(lines.length>2001)break;
+  }
+  el('paste-conso').value=lines.slice(0,500).join('\n');
+  alert('Données exemple chargées (500 points — 1 semaine). Cliquez "Analyser".');
+}
+
+function loadSampleSpot(){
+  const lines=['Timestamp;Prix EPEX [€/MWh]'];
+  const base=new Date(2023,0,1,0,0);
+  for(let i=0;i<8760;i++){
+    const d=new Date(base.getTime()+i*3600000);
+    const h=d.getHours(),dow=d.getDay();
+    const base_p=80+(dow>0&&dow<6?((h>7&&h<22)?120*Math.sin((h-7)/15*Math.PI):0):0)+Math.random()*30-15;
+    const dd=String(d.getDate()).padStart(2,'0'),mm=String(d.getMonth()+1).padStart(2,'0');
+    const hh=String(d.getHours()).padStart(2,'0');
+    lines.push(`${dd}/${mm}/${d.getFullYear()} ${hh}:00;${Math.max(0,base_p).toFixed(2)}`);
+  }
+  el('paste-spot').value=lines.slice(0,200).join('\n');
+  alert('Exemple EPEX chargé (200 heures). Cliquez "Analyser les prix spot".');
+}
+
+function updateRecap(){
+  if(el('sr-hp')){
+    el('sr-hp').textContent=(el('p-offtake-hp').value||'—')+' €/MWh';
+    el('sr-hc').textContent=(el('p-offtake-hc').value||'—')+' €/MWh';
+    el('sr-inj-hp').textContent=(el('p-inject-hp').value||'—')+' €/MWh';
+    el('sr-monthly').textContent=(el('p-monthly-peak').value||'—')+' €/kW/mois';
+    el('sr-grid').textContent=(el('site-grid-limit').value||'—')+' kW';
+    el('sr-conso').textContent=S.conso?`✓ ${fmt(S.conso.length)} pts`:'❌ Non chargée';
+    el('sr-pv').textContent=S.pvSlots?(S.pvMode==='none'?'✓ Sans PV':`✓ ${fmt(S.pvSlots.reduce((a,b)=>a+b.pv,0)*0.25/1000,1)} MWh/an`):'❌ Non définie';
+    el('sr-prix').textContent={tou:'✓ Tarif HP/HC',flat:'✓ Tarif fixe',spot:S.spotPrices?`✓ Spot (${fmt(S.spotPrices.length)} pts)`:'❌ Spot non chargé',index:'✓ Indexé'}[S.priceType]||'—';
+  }
+}
+
+// ═══════════════════════ HELPERS FINANCIERS ═══════════════════════
+function pmt(r,n,pv){return r===0?pv/n:pv*r*Math.pow(1+r,n)/(Math.pow(1+r,n)-1);}
+function irrCalc(equity,cfs){
+  const f=r=>{let s=-equity;cfs.forEach((c,i)=>s+=c/Math.pow(1+r,i+1));return s;};
+  if(f(50)<=0)return null;
+  let lo=-0.99,hi=50;
+  for(let i=0;i<300;i++){const m=(lo+hi)/2;f(m)>0?hi=m:lo=m;if(hi-lo<1e-8)break;}
   return (lo+hi)/2;
 }
-function isHP(h, dow) {
-  const hpS = parseInt(el('hp-start').value)||7;
-  const hpE = parseInt(el('hp-end').value)||22;
-  return h >= hpS && h < hpE && dow > 0 && dow < 6;
+function isHP(h,dow){
+  const s=parseInt(el('p-hp-start').value)||7,e=parseInt(el('p-hp-end').value)||22;
+  return h>=s&&h<e&&dow>0&&dow<6;
+}
+function getTariff(h,dow,type){
+  if(type==='flat')return parseFloat(el('p-flat').value)||240;
+  if(type==='tou'||type==='index')return isHP(h,dow)?(parseFloat(el('p-offtake-hp').value)||290):(parseFloat(el('p-offtake-hc').value)||200);
+  return 200;
+}
+function getInjectTariff(h,dow){
+  return isHP(h,dow)?(parseFloat(el('p-inject-hp').value)||70):(parseFloat(el('p-inject-hc').value)||50);
 }
 
-// ═══════════════════════════════════════════════════════════
-// SIMULATION ENGINE
-// ═══════════════════════════════════════════════════════════
-function runDispatch(slots, battCfg, siteCfg, scenKey) {
-  const { cap, pow, effRT, socMin, socMax } = battCfg;
-  const fcrFrac  = (getScen(scenKey,'fcr-frac')||0)/100;
-  const dt = 0.25;
-  const effC = Math.sqrt(effRT);
-  const effD = Math.sqrt(effRT);
-  const dispPow = pow * (1 - fcrFrac);
+// ═══════════════════════ SIMULATION ENGINE ═══════════════════════
+function mergeData(){
+  if(!S.conso||S.conso.length<96){alert('Données de consommation manquantes ou insuffisantes (minimum 96 points).');return null;}
 
-  // Pre-compute daily arbitrage thresholds
-  const dailyThresh = precomputeThresholds(slots, siteCfg);
+  // ── Select best year from consumption data ──
+  let consoSlots = S.conso;
+  const years = {};
+  S.conso.forEach(s => { if(s.ts){ const y=s.ts.getFullYear(); years[y]=(years[y]||0)+1; }});
+  const fullYears = Object.entries(years).filter(([y,c])=>c>=35000).map(([y])=>+y).sort((a,b)=>b-a);
+  if(fullYears.length > 0){
+    const yr = fullYears[0];
+    consoSlots = S.conso.filter(s=>s.ts&&s.ts.getFullYear()===yr);
+    if(Object.keys(years).length > 1){
+      el('conso-year-note').style.display='block';
+      el('conso-year-note').innerHTML=`📅 <strong>Données multi-années</strong> (${Object.keys(years).sort().join(', ')}). Simulation sur l'année <strong>${yr}</strong> (${fmt(consoSlots.length)} points).`;
+    }
+  }
 
-  let soc = cap * 0.5;
-  const res = [];
-  const peakTarget = siteCfg.gridLimit * (parseInt(el('peak-threshold-pct').value)||80) / 100;
-  const strategy = el('dispatch-strategy').value;
-
-  for (let i = 0; i < slots.length; i++) {
-    const { ts, cons, pv, price } = slots[i];
-    const h  = ts ? ts.getHours() + ts.getMinutes()/60 : (i%96)*0.25;
-    const dow = ts ? ts.getDay() : (Math.floor(i/96)%7)+1;
-    const hp = isHP(Math.floor(h), dow);
-    const netLoad = cons - pv; // positive = buying from grid
-
-    const maxChargePow = Math.min(dispPow, (cap*socMax - soc) / (dt*effC));
-    const maxDischPow  = Math.min(dispPow, (soc - cap*socMin) * effD / dt);
-
-    let battAC = 0; // positive = charging, negative = discharging
-
-    // --- DISPATCH LOGIC ---
-    if (strategy === 'autoconso' || strategy === 'combined') {
-      if (netLoad < 0 && maxChargePow > 0.01) {
-        // PV surplus → charge
-        battAC = Math.min(-netLoad, maxChargePow);
-      } else if (netLoad > 0 && maxDischPow > 0.01) {
-        // Has demand → discharge if peak or HP
-        if (hp || soc > cap * 0.65) {
-          battAC = -Math.min(netLoad, maxDischPow);
-        }
+  const merged=consoSlots.map((s,i)=>{
+    // PV — align by calendar day+time when timestamps available
+    let pv=0;
+    if(S.pvSlots&&S.pvSlots.length>0&&S.pvMode!=='none'){
+      if(s.ts&&S.pvSlots[0]&&S.pvSlots[0].ts){
+        const pvYr=S.pvSlots[0].ts.getFullYear();
+        const pvTs=new Date(pvYr,s.ts.getMonth(),s.ts.getDate(),s.ts.getHours(),s.ts.getMinutes());
+        const pvIdx=S.pvSlots.findIndex(p=>p.ts&&Math.abs(p.ts-pvTs)<60000);
+        pv=pvIdx>=0?S.pvSlots[pvIdx].pv:(S.pvSlots[i%S.pvSlots.length]?.pv||0);
+      } else {
+        pv=S.pvSlots[i%S.pvSlots.length]?.pv||0;
       }
     }
-
-    if ((strategy === 'peak' || strategy === 'combined') && battAC === 0) {
-      const netAfter = netLoad + battAC;
-      if (netAfter > peakTarget && maxDischPow > 0.01) {
-        battAC = -Math.min(netAfter - peakTarget, maxDischPow);
-      }
-    } else if (strategy === 'combined' && battAC !== 0) {
-      // Also apply peak shaving on top of autoconso
-      const netAfter = netLoad + battAC;
-      if (netAfter > peakTarget && maxDischPow > 0.01) {
-        const extra = Math.min(netAfter - peakTarget, maxDischPow + battAC);
-        battAC = -(Math.abs(battAC) + extra);
-      }
+    // Price
+    let price=null;
+    if(S.priceType==='spot'&&S.spotPrices&&S.spotPrices.length>0){
+      const pi=S.spotPrices.length>i?i:i%S.spotPrices.length;
+      price=S.spotPrices[pi].price;
+    } else if(S.priceType==='index'&&S.spotPrices&&S.spotPrices.length>0){
+      const pi=S.spotPrices.length>i?i:i%S.spotPrices.length;
+      price=S.spotPrices[pi].price+(parseFloat(el('p-idx-markup').value)||25);
     }
+    const h=s.ts?s.ts.getHours():Math.floor((i%96)*0.25);
+    const dow=s.ts?s.ts.getDay():((Math.floor(i/96))%7)+1;
+    return {...s,pv,price,h,dow,hp:isHP(h,dow)};
+  });
+  return merged;
+}
 
-    if ((strategy === 'arbitrage' || strategy === 'combined') && battAC === 0) {
-      const thresh = dailyThresh[Math.floor(i/96)] || { lo: Infinity, hi: -Infinity };
-      const usePrice = (price !== null && price !== undefined);
-      const p = usePrice ? price : (hp ? siteCfg.offtakeHP : siteCfg.offtakeHC);
-      if (p < thresh.lo && maxChargePow > 0.01) {
-        battAC = maxChargePow;
-      } else if (p > thresh.hi && maxDischPow > 0.01) {
-        battAC = -maxDischPow;
-      }
+function runDispatch(data,battCfg,scenKey){
+  const {cap,pow,effRT,socMin,socMax}=battCfg;
+  const fcrFrac=(getV(scenKey+'-fcr-frac')||0)/100;
+  const dt=0.25,effC=Math.sqrt(effRT),effD=Math.sqrt(effRT);
+  const dispPow=pow*(1-fcrFrac);
+  const peakThrPct=(parseFloat(el('peak-thr-pct').value)||80)/100;
+  const strategy=el('dispatch-strategy').value;
+  const gridLimit=parseFloat(el('site-grid-limit').value)||172.5;
+
+  // Pre-compute daily thresholds
+  const nDays=Math.ceil(data.length/96);
+  const dayThresh=[];
+  for(let d=0;d<nDays;d++){
+    const ps=data.slice(d*96,(d+1)*96).map(s=>s.price!==null&&s.price!==undefined?s.price:(s.hp?getV('p-offtake-hp'):getV('p-offtake-hc'))).sort((a,b)=>a-b);
+    dayThresh.push({lo:ps[Math.floor(ps.length*0.25)]||0,hi:ps[Math.floor(ps.length*0.75)]||9999});
+  }
+
+  let soc=cap*0.5;
+  const peakMax=Math.max(...data.map(s=>Math.max(0,s.cons-s.pv)));
+  const peakTarget=peakMax*peakThrPct;
+  const res=[];
+
+  for(let i=0;i<data.length;i++){
+    const s=data[i];
+    const netLoad=s.cons-s.pv;
+    const maxCPow=Math.min(dispPow,(cap*socMax-soc)/(dt*effC));
+    const maxDPow=Math.min(dispPow,(soc-cap*socMin)*effD/dt);
+    let bAC=0;
+
+    if(strategy==='autoconso'||strategy==='combined'){
+      if(netLoad<0&&maxCPow>0.01)bAC=Math.min(-netLoad,maxCPow);
+      else if(netLoad>0&&maxDPow>0.01&&(s.hp||soc>cap*0.6))bAC=-Math.min(netLoad,maxDPow);
     }
-
-    // Apply action
-    if (battAC > 0)      soc += battAC * dt * effC;
-    else if (battAC < 0) soc -= (-battAC) * dt / effD;
-    soc = Math.max(cap*socMin, Math.min(cap*socMax, soc));
-
-    const netGrid = netLoad + battAC;
-    res.push({ ts, cons, pv, price, h, dow, hp, netLoad, battAC, netGrid, soc });
+    if((strategy==='peak'||strategy==='combined')&&bAC===0){
+      const netA=netLoad+bAC;
+      if(netA>peakTarget&&maxDPow>0.01)bAC=-Math.min(netA-peakTarget,maxDPow);
+    } else if(strategy==='combined'&&bAC!==0){
+      const netA=netLoad+bAC;
+      if(netA>peakTarget&&maxDPow>0.01){const ex=Math.min(netA-peakTarget,maxDPow+bAC);bAC=-ex;}
+    }
+    if((strategy==='arbitrage'||strategy==='combined')&&bAC===0){
+      const th=dayThresh[Math.floor(i/96)]||{lo:Infinity,hi:-Infinity};
+      const p=s.price!==null&&s.price!==undefined?s.price:(s.hp?getV('p-offtake-hp'):getV('p-offtake-hc'));
+      if(p<th.lo&&maxCPow>0.01)bAC=maxCPow;
+      else if(p>th.hi&&maxDPow>0.01)bAC=-maxDPow;
+    }
+    if(bAC>0)soc+=bAC*dt*effC;
+    else if(bAC<0)soc-=(-bAC)*dt/effD;
+    soc=Math.max(cap*socMin,Math.min(cap*socMax,soc));
+    res.push({...s,bAC,netGrid:netLoad+bAC,soc});
   }
   return res;
 }
 
-function precomputeThresholds(slots, siteCfg) {
-  const days = Math.ceil(slots.length / 96);
-  const thresholds = [];
-  for (let d = 0; d < days; d++) {
-    const daySlots = slots.slice(d*96, (d+1)*96);
-    const prices = daySlots.map((s,i) => {
-      if (s.price !== null && s.price !== undefined) return s.price;
-      const h = s.ts ? s.ts.getHours() : i*0.25;
-      const dow = s.ts ? s.ts.getDay() : 1;
-      return isHP(h, dow) ? siteCfg.offtakeHP : siteCfg.offtakeHC;
-    }).sort((a,b)=>a-b);
-    const lo = prices[Math.floor(prices.length*0.25)] || 0;
-    const hi = prices[Math.floor(prices.length*0.75)] || Infinity;
-    thresholds.push({ lo, hi });
+function calcRevenues(baseline,sim,scenKey){
+  const dt=0.25;
+  let autoSav=0;
+  for(let i=0;i<baseline.length;i++){
+    const b=baseline[i],s=sim[i];
+    const t=getTariff(b.h,b.dow,S.priceType)/1000;
+    const ti=getInjectTariff(b.h,b.dow)/1000;
+    autoSav+=(Math.max(0,b.netGrid)-Math.max(0,s.netGrid))*t*dt;
+    autoSav+=(Math.max(0,-s.netGrid)-Math.max(0,-b.netGrid))*ti*dt;
   }
-  return thresholds;
-}
-
-// ═══════════════════════════════════════════════════════════
-// REVENUE CALCULATION
-// ═══════════════════════════════════════════════════════════
-function calcRevenues(baseline, simulated, siteCfg, scenKey) {
-  const dt = 0.25;
-  let autoconsoSav = 0, injChange = 0;
-
-  for (let i = 0; i < baseline.length; i++) {
-    const b = baseline[i], s = simulated[i];
-    const tariff = (b.hp ? siteCfg.offtakeHP : siteCfg.offtakeHC) / 1000; // €/kWh
-    const injTar = (b.hp ? siteCfg.injectHP : siteCfg.injectHC) / 1000;
-
-    const offtakeBefore = Math.max(0, b.netGrid) * dt;
-    const offtakeAfter  = Math.max(0, s.netGrid) * dt;
-    const injBefore     = Math.max(0, -b.netGrid) * dt;
-    const injAfter      = Math.max(0, -s.netGrid) * dt;
-
-    autoconsoSav += (offtakeBefore - offtakeAfter) * tariff;
-    injChange    += (injAfter - injBefore) * injTar; // negative if we inject less
-  }
-  autoconsoSav += injChange;
-
   // Peak shaving
-  const mPeakBefore = monthlyPeaks(baseline, 'netGrid');
-  const mPeakAfter  = monthlyPeaks(simulated, 'netGrid');
-  let peakSav = 0;
-  for (let m = 0; m < 12; m++) {
-    const red = Math.max(0, (mPeakBefore[m]||0) - (mPeakAfter[m]||0));
-    peakSav += red * siteCfg.monthlyPeakTariff;
-  }
-  const annualPeakBefore = Math.max(...Object.values(mPeakBefore));
-  const annualPeakAfter  = Math.max(...Object.values(mPeakAfter));
-  peakSav += Math.max(0, annualPeakBefore - annualPeakAfter) * siteCfg.yearlyPeakTariff;
-
-  // Arbitrage (simulation-based if prices available, else formula)
-  let arbitrage = 0;
-  const hasPrice = simulated.some(s => s.price !== null && s.price !== undefined);
-  if (hasPrice) {
-    for (let i = 0; i < simulated.length; i++) {
-      const s = simulated[i];
-      const p = s.price || 0;
-      arbitrage += -s.battAC * p * dt / 1000; // discharge earns, charge costs
+  const mPB=mPeaks(baseline),mPA=mPeaks(sim);
+  let peakSav=0;
+  for(let m=0;m<12;m++)peakSav+=Math.max(0,(mPB[m]||0)-(mPA[m]||0))*(parseFloat(el('p-monthly-peak').value)||6.76);
+  peakSav+=Math.max(0,Math.max(...Object.values(mPB))-Math.max(...Object.values(mPA)))*(parseFloat(el('p-yearly-peak').value)||40.54);
+  // Arbitrage
+  let arb=0;
+  const arbMode=el(scenKey+'-arb-mode')?.value||'auto';
+  const hasSpot=sim.some(s=>s.price!==null&&s.price!==undefined);
+  if(arbMode!=='disabled'){
+    if(hasSpot&&arbMode!=='tou'){
+      for(let i=0;i<sim.length;i++){const s=sim[i];if(s.price)arb+=-s.bAC*(s.price||0)*dt/1000;}
+    } else {
+      const spread=getV(scenKey+'-arb-spread')||0;
+      const cycles=getV(scenKey+'-arb-cycles')||0;
+      const cap=parseFloat(el('batt-cap').value)||215;
+      const eff=(parseFloat(el('batt-eff').value)||92)/100;
+      arb=spread/1000*cap*eff*cycles*365;
     }
-    // Remove autoconso portion (already counted above)
-    // Simple deduction: arbitrage only for market slots
-  } else {
-    // Formula-based
-    const spread = parseFloat(el(scenKey+'-arb-spread').value)||0;
-    const cycles = parseFloat(el(scenKey+'-arb-cycles').value)||0;
-    const capKwh = parseFloat(el('batt-cap').value)||215;
-    const eff = (parseFloat(el('batt-eff').value)||92)/100;
-    arbitrage = spread/1000 * capKwh * eff * cycles * 365;
   }
-
   // FCR
-  const fcrFrac  = (parseFloat(el(scenKey+'-fcr-frac').value)||0)/100;
-  const fcrAvail = (parseFloat(el(scenKey+'-fcr-avail').value)||0)/100;
-  const fcrPrice = parseFloat(el(scenKey+'-fcr-price').value)||0;
-  const pow = parseFloat(el('batt-pow').value)||100;
-  const fcrRev = pow * fcrFrac * fcrPrice * 8760 * fcrAvail / 1000;
-
+  const pow=parseFloat(el('batt-pow').value)||100;
+  const fcrF=(getV(scenKey+'-fcr-frac')||0)/100,fcrA=(getV(scenKey+'-fcr-avail')||0)/100,fcrP=getV(scenKey+'-fcr-price')||0;
+  const fcr=pow*fcrF*fcrP*8760*fcrA/1000;
   // aFRR
-  const afrFrac  = (parseFloat(el(scenKey+'-afrr-frac').value)||0)/100;
-  const afrAvail = (parseFloat(el(scenKey+'-afrr-avail').value)||0)/100;
-  const afrPrice = parseFloat(el(scenKey+'-afrr-price').value)||0;
-  const afrRev   = pow * afrFrac * afrPrice * 8760 * afrAvail / 1000;
-
+  const afrF=(getV(scenKey+'-afrr-frac')||0)/100,afrA=(getV(scenKey+'-afrr-avail')||0)/100,afrP=getV(scenKey+'-afrr-price')||0;
+  const afrr=pow*afrF*afrP*8760*afrA/1000;
   // Imbalance
-  const capKwh = parseFloat(el('batt-cap').value)||215;
-  const imbalUnit = parseFloat(el(scenKey+'-imbal').value)||0;
-  const imbalRev = imbalUnit * capKwh;
+  const capKwh=parseFloat(el('batt-cap').value)||215;
+  const imbal=(getV(scenKey+'-imbal')||0)*capKwh;
 
-  return {
-    autoconso:   Math.max(0, autoconsoSav),
-    peakShaving: Math.max(0, peakSav),
-    arbitrage:   Math.max(0, arbitrage),
-    fcr:         fcrRev,
-    afrr:        afrRev,
-    imbalance:   imbalRev,
-    total: Math.max(0, autoconsoSav) + Math.max(0, peakSav) + Math.max(0, arbitrage) + fcrRev + afrRev + imbalRev
-  };
+  return {autoconso:Math.max(0,autoSav),peak:Math.max(0,peakSav),arb:Math.max(0,arb),fcr,afrr,imbal,total:Math.max(0,autoSav)+Math.max(0,peakSav)+Math.max(0,arb)+fcr+afrr+imbal};
 }
 
-function monthlyPeaks(slots, field) {
-  const peaks = {};
-  slots.forEach(s => {
-    if (!s.ts) return;
-    const m = s.ts.getMonth();
-    const v = s[field] || 0;
-    if (v > (peaks[m]||0)) peaks[m] = v;
-  });
-  return peaks;
+function mPeaks(slots){
+  const p={};
+  slots.forEach(s=>{if(s.ts){const m=s.ts.getMonth();const v=Math.max(0,s.netGrid||0);if(v>(p[m]||0))p[m]=v;}});
+  return p;
 }
+function getV(id){return parseFloat(el(id)?.value)||0;}
 
-// ═══════════════════════════════════════════════════════════
-// FINANCIAL MODEL
-// ═══════════════════════════════════════════════════════════
-function calcFinancials(revenues) {
-  const capexBatt = parseFloat(el('fin-capex-batt').value)||0;
-  const capexInst = parseFloat(el('fin-capex-install').value)||0;
-  const capexRec  = parseFloat(el('fin-capex-recycle').value)||0;
-  const subsidy   = parseFloat(el('fin-capex-subsidy').value)||0;
-  const capexNet  = capexBatt + capexInst + capexRec - subsidy;
-  const opex      = parseFloat(el('fin-opex').value)||0;
-  const ems       = parseFloat(el('fin-ems').value)||0;
-  const wacc      = (parseFloat(el('fin-wacc').value)||8)/100;
-  const duration  = parseInt(el('fin-duration').value)||15;
-  const inflation = (parseFloat(el('fin-inflation').value)||1.5)/100;
-  const model     = S.finModel;
+function calcFin(rev){
+  const cap=(parseFloat(el('fin-capex-batt').value)||0)+(parseFloat(el('fin-capex-install').value)||0)+(parseFloat(el('fin-capex-recycle').value)||0)-(parseFloat(el('fin-capex-subsidy').value)||0);
+  const opex=getV('fin-opex'),ems=getV('fin-ems');
+  const wacc=getV('fin-wacc')/100,dur=parseInt(el('fin-duration').value)||15;
+  const infla=getV('fin-inflation')/100;
+  const dr=getV('fin-debt-ratio')/100,lr=getV('fin-loan-rate')/100,ly=parseInt(el('fin-loan-years').value)||7;
+  const equity=cap*(1-dr),debt=cap*dr;
+  const annuity=debt>0?pmt(lr,ly,debt):0;
+  const wgiShare=getV('fin-wgi-share')/100;
+  // Aggregator fees (base scenario values)
+  const fcrAgg=getV('base-fcr-agg')/100,afrAgg=getV('base-afrr-agg')/100;
+  const gridRevs=rev.fcr+rev.afrr+rev.imbal+rev.arb;
+  const aggFees=gridRevs*Math.max(fcrAgg,afrAgg);
+  const deductions=aggFees+opex+ems;
+  const netRev=Math.max(0,rev.total-deductions);
 
-  // Aggregator fees (use base scenario)
-  const fcrAgg  = (parseFloat(el('base-fcr-agg').value)||38)/100;
-  const afrAgg  = (parseFloat(el('base-afrr-agg').value)||35)/100;
-  const gridServiceRev = revenues.fcr + revenues.afrr + revenues.imbalance + revenues.arbitrage;
-  const aggFees = gridServiceRev * Math.max(fcrAgg, afrAgg); // conservative: max rate
-
-  const grossRev = revenues.total;
-  const totalDeductions = aggFees + opex + ems;
-  const netRev   = Math.max(0, grossRev - totalDeductions);
-
-  // Financing (tiers)
-  const dr       = (parseFloat(el('fin-debt-ratio').value)||70)/100;
-  const loanRate = (parseFloat(el('fin-loan-rate').value)||4.5)/100;
-  const loanYrs  = parseInt(el('fin-loan-years').value)||7;
-  const equity   = capexNet * (1 - dr);
-  const debt     = capexNet * dr;
-  const annuity  = debt > 0 ? pmt(loanRate, loanYrs, debt) : 0;
-
-  const wgiShare = (parseFloat(el('fin-wgi-share').value)||60)/100;
-
-  // Build annual cash flows
-  const cfs = [], cfsClient = [];
-  for (let y = 1; y <= duration; y++) {
-    const inflFactor = Math.pow(1 + inflation, y - 1);
-    const yr_gross = grossRev * inflFactor;
-    const yr_net   = netRev * inflFactor;
-
-    if (model === 'tiers') {
-      const wgiCF = yr_net * wgiShare - (y <= loanYrs ? annuity : 0);
-      const clientCF = yr_net * (1 - wgiShare);
-      cfs.push(wgiCF);
-      cfsClient.push(clientCF);
-    } else if (model === 'propres') {
-      const clientCF = yr_gross - aggFees * inflFactor - (opex + ems) * inflFactor;
-      cfs.push(clientCF);
-      cfsClient.push(clientCF);
-    } else if (model === 'leasing') {
-      const lease = parseFloat(el('fin-lease-annual').value)||0;
-      const wgiCF = lease - (y <= loanYrs ? annuity : 0);
-      const clientCF = yr_gross - aggFees * inflFactor - (opex + ems) * inflFactor - lease;
-      cfs.push(wgiCF);
-      cfsClient.push(clientCF);
+  const cfs=[],cfsC=[];
+  for(let y=1;y<=dur;y++){
+    const inf=Math.pow(1+infla,y-1);
+    const net=netRev*inf;
+    if(S.finModel==='tiers'){
+      cfs.push(net*wgiShare-(y<=ly?annuity:0));
+      cfsC.push(net*(1-wgiShare));
+    } else if(S.finModel==='propres'){
+      const cf=(rev.total-aggFees-opex-ems)*inf;
+      cfs.push(cf);cfsC.push(cf);
+    } else {
+      const lease=getV('fin-lease-annual');
+      cfs.push(lease-(y<=ly?annuity:0));
+      cfsC.push((rev.total-aggFees-opex-ems)*inf-lease);
     }
   }
-
-  // NPV, TRI on WGI equity (tiers) or client CAPEX (propres)
-  const investBase = model === 'tiers' ? equity : capexNet;
-  const cfTotal = cfs.reduce((a,b)=>a+b,0);
-  const cfMoy   = cfTotal / duration;
-  let npv = -investBase;
-  cfs.forEach((c,i) => npv += c/Math.pow(1+wacc,i+1));
-  const irrVal = irr(investBase, cfs);
-  const paybackGross = grossRev > 0 ? capexNet / (grossRev - aggFees - opex - ems) : null;
-
-  return {
-    capexNet, equity, debt, annuity, grossRev, totalDeductions, netRev,
-    aggFees, cfs, cfsClient, cfTotal, cfMoy, npv, irr: irrVal, paybackGross,
-    profitabilityIndex: investBase > 0 ? (npv + investBase) / investBase : 0,
-    model, duration, wgiShare, opex, ems, aggFees,
-    monthlyPeakBefore: null, monthlyPeakAfter: null
-  };
+  const cfTotal=cfs.reduce((a,b)=>a+b,0),cfMoy=cfTotal/dur;
+  let npv=-equity;cfs.forEach((c,i)=>npv+=c/Math.pow(1+wacc,i+1));
+  const invBase=S.finModel==='tiers'?equity:cap;
+  const irrV=irrCalc(invBase,cfs);
+  const payback=(() => {let cum=0,cp=0;for(let i=0;i<cfs.length;i++){const cn=cp+(rev.fcr+rev.afrr+rev.arb+rev.autoconso+rev.peak)*Math.pow(1+infla,i);if(cn>=cap&&cum==null)return i+(cap-cp)/(cn-cp);cp=cn;}return null;})();
+  return {cap,equity,debt,annuity,rev,deductions,aggFees,netRev,cfs,cfsC,cfTotal,cfMoy,npv,irr:irrV,payback:cap>0?cap/(rev.total-deductions):null,ip:invBase>0?(npv+invBase)/invBase:0,dur,wgiShare};
 }
 
-// ═══════════════════════════════════════════════════════════
-// MAIN SIMULATION RUNNER
-// ═══════════════════════════════════════════════════════════
-function runSimulation() {
-  if (!S.rawSlots || S.rawSlots.length < 96) {
-    alert('Importez d\'abord vos données quart-horaires (Tab 1). Minimum 96 points requis.');
-    return;
+// ═══════════════════════ RUN SIMULATION ═══════════════════════
+let chartMonthly=null,chartWeekly=null;
+
+function runSimulation(){
+  const data=mergeData();
+  if(!data)return;
+  const battCfg={cap:parseFloat(el('batt-cap').value)||215,pow:parseFloat(el('batt-pow').value)||100,effRT:(parseFloat(el('batt-eff').value)||92)/100,socMin:(parseFloat(el('batt-soc-min').value)||10)/100,socMax:(parseFloat(el('batt-soc-max').value)||90)/100};
+  const prog=el('prog-sim');prog.classList.add('visible');
+  const steps=[[10,'Préparation des données...'],[30,'Dispatch batterie (3 scénarios)...'],[65,'Calcul des revenus...'],[85,'Modèle financier...'],[98,'Rendu des résultats...']];
+  let step=0;
+  function next(){
+    if(step>=steps.length){el('fill-sim').style.width='100%';el('lbl-sim').textContent='✓ Simulation terminée !';render();el('badge-res').textContent='✓';document.querySelector('.ntab[data-tab="t5"]').click();return;}
+    const [p,l]=steps[step++];el('fill-sim').style.width=p+'%';el('lbl-sim').textContent=l;
+    setTimeout(next,40);
   }
-
-  const prog = el('sim-progress');
-  prog.classList.add('visible');
-
-  const steps = [
-    [10, 'Lecture des paramètres...'],
-    [25, 'Simulation dispatch batterie...'],
-    [55, 'Calcul des revenus...'],
-    [75, 'Modèle financier (3 scénarios)...'],
-    [95, 'Génération des résultats...'],
-  ];
-
-  let step = 0;
-  function nextStep() {
-    if (step >= steps.length) {
-      el('sim-fill').style.width = '100%';
-      el('sim-label').textContent = '✓ Simulation terminée !';
-      renderResults();
-      el('badge-res').textContent = '✓ Calculé';
-      // Switch to results tab
-      document.querySelectorAll('.ntab').forEach(t => t.classList.remove('active'));
-      document.querySelectorAll('.tab-section').forEach(s => s.classList.remove('active'));
-      document.querySelector('.ntab[data-tab="t5"]').classList.add('active');
-      el('t5').classList.add('active');
-      return;
-    }
-    const [pct, label] = steps[step++];
-    el('sim-fill').style.width = pct + '%';
-    el('sim-label').textContent = label;
-    setTimeout(nextStep, 30);
-  }
-
-  setTimeout(() => {
-    const battCfg = {
-      cap:    parseFloat(el('batt-cap').value)||215,
-      pow:    parseFloat(el('batt-pow').value)||100,
-      effRT:  (parseFloat(el('batt-eff').value)||92)/100,
-      socMin: (parseFloat(el('batt-soc-min').value)||10)/100,
-      socMax: (parseFloat(el('batt-soc-max').value)||90)/100,
-    };
-    const siteCfg = {
-      gridLimit:        parseFloat(el('site-grid-limit').value)||172.5,
-      offtakeHP:        parseFloat(el('tarif-offtake-hp').value)||290,
-      offtakeHC:        parseFloat(el('tarif-offtake-hc').value)||200,
-      injectHP:         parseFloat(el('tarif-inject-hp').value)||70,
-      injectHC:         parseFloat(el('tarif-inject-hc').value)||50,
-      monthlyPeakTariff:parseFloat(el('tarif-monthly-peak').value)||6.76,
-      yearlyPeakTariff: parseFloat(el('tarif-yearly-peak').value)||40.54,
-    };
-
-    // Baseline: slots as-is (no battery dispatch changes)
-    const baseline = S.rawSlots.map(s => ({ ...s, netLoad: s.cons - s.pv, battAC: 0, netGrid: s.cons - s.pv, soc: 0, hp: isHP(s.ts ? s.ts.getHours() : 0, s.ts ? s.ts.getDay() : 1) }));
-
-    // Dispatch per scenario
-    const simCons = runDispatch(S.rawSlots, battCfg, siteCfg, 'cons');
-    const simBase = runDispatch(S.rawSlots, battCfg, siteCfg, 'base');
-    const simOpti = runDispatch(S.rawSlots, battCfg, siteCfg, 'opti');
-
-    // Revenues
-    const revCons = calcRevenues(baseline, simCons, siteCfg, 'cons');
-    const revBase = calcRevenues(baseline, simBase, siteCfg, 'base');
-    const revOpti = calcRevenues(baseline, simOpti, siteCfg, 'opti');
-
-    // Financials
-    const finBase = calcFinancials(revBase);
-    const finCons = calcFinancials(revCons);
-    const finOpti = calcFinancials(revOpti);
-
-    S.simResults = { baseline, simBase, revCons, revBase, revOpti, finBase, finCons, finOpti, battCfg, siteCfg };
-    nextStep();
-  }, 50);
-  nextStep();
+  setTimeout(()=>{
+    const baseline=data.map(s=>({...s,bAC:0,netGrid:s.cons-s.pv,soc:0}));
+    const simC=runDispatch(data,battCfg,'cons'),simB=runDispatch(data,battCfg,'base'),simO=runDispatch(data,battCfg,'opti');
+    const revC=calcRevenues(baseline,simC,'cons'),revB=calcRevenues(baseline,simB,'base'),revO=calcRevenues(baseline,simO,'opti');
+    const finB=calcFin(revB),finC=calcFin(revC),finO=calcFin(revO);
+    S.simResults={baseline,simB,revC,revB,revO,finB,finC,finO,battCfg,data};
+    next();
+  },50);
+  next();
 }
 
-function getScen(key, param) {
-  return el(key + '-' + param) ? parseFloat(el(key + '-' + param).value) : 0;
-}
-
-// ═══════════════════════════════════════════════════════════
-// RESULTS RENDERER
-// ═══════════════════════════════════════════════════════════
-let chartMonthly = null, chartWeekly = null;
-
-function renderResults() {
-  const { baseline, simBase, revCons, revBase, revOpti, finBase, finCons, finOpti } = S.simResults;
-
+function render(){
+  const {baseline,simB,revC,revB,revO,finB,finC,finO,data}=S.simResults;
   el('res-placeholder').classList.add('hidden');
   el('res-content').classList.remove('hidden');
-
-  const dur = parseInt(el('fin-duration').value)||15;
-  el('res-title').textContent = 'Résultats — BESS ' + (el('batt-cap').value) + ' kWh / ' + (el('batt-pow').value) + ' kW';
-  el('res-subtitle').textContent = fmt(baseline.length) + ' quarts d\'heure simulés · Modèle : ' + ({tiers:'Tiers-investissement',propres:'Fonds propres',leasing:'Leasing'}[S.finModel]);
+  const cap=parseFloat(el('batt-cap').value)||215,pow=parseFloat(el('batt-pow').value)||100;
+  el('res-title').textContent=`BESS ${cap} kWh / ${pow} kW — ${S.selectedCity||''}`;
+  el('res-sub').textContent=`${fmt(baseline.length)} quarts d'heure · ${S.pvMode==='none'?'Sans PV':(S.pvMode==='simulate'?`PV simulé ${el('pv-kwc').value} kWc`:'PV mesuré')} · Modèle ${S.finModel}`;
 
   // KPIs
-  el('res-kpis').innerHTML = `
-    <div class="kpi blue"><div class="kl">Revenus bruts / an</div><div class="kv">${fmt(revBase.total/1000,1)} k€</div><div class="ks">Scénario Base</div></div>
-    <div class="kpi green"><div class="kl">TRI WGI</div><div class="kv">${finBase.irr!==null?fmt(finBase.irr*100,1)+'%':'n/a'}</div><div class="ks">Rentabilité interne</div></div>
-    <div class="kpi gold"><div class="kl">Payback CAPEX</div><div class="kv">${finBase.paybackGross?fmt(finBase.paybackGross,1)+' ans':'n/a'}</div><div class="ks">CAPEX ÷ revenus nets</div></div>
-    <div class="kpi teal"><div class="kl">VAN (WACC ${el('fin-wacc').value}%)</div><div class="kv">${fmt(finBase.npv/1000,1)} k€</div><div class="ks">Base · ${dur} ans</div></div>
-    <div class="kpi red"><div class="kl">CAPEX Net</div><div class="kv">${fmt(finBase.capexNet/1000,1)} k€</div><div class="ks">Investissement total WGI</div></div>
+  el('res-kpis').innerHTML=`
+    <div class="kpi blue"><div class="kl">Revenus bruts/an</div><div class="kv">${fmt(revB.total/1000,1)} k€</div><div class="ks">Scénario Base</div></div>
+    <div class="kpi green"><div class="kl">TRI WGI</div><div class="kv">${finB.irr?fmt(finB.irr*100,1)+'%':'n/a'}</div><div class="ks">Taux de rentabilité interne</div></div>
+    <div class="kpi gold"><div class="kl">Payback CAPEX</div><div class="kv">${finB.payback?fmt(finB.payback,1)+' ans':'n/a'}</div><div class="ks">CAPEX ÷ revenus nets</div></div>
+    <div class="kpi teal"><div class="kl">VAN (WACC ${el('fin-wacc').value}%)</div><div class="kv">${fmt(finB.npv/1000,1)} k€</div><div class="ks">Scénario Base</div></div>
+    <div class="kpi red"><div class="kl">CAPEX Net</div><div class="kv">${fmt(finB.cap/1000,1)} k€</div><div class="ks">Investissement WGI</div></div>
   `;
 
-  // Baseline vs with battery
-  const totalConsBefore = baseline.reduce((a,b)=>a+Math.max(0,b.netGrid)*0.25,0)/1000;
-  const totalConsWith   = simBase.reduce((a,b)=>a+Math.max(0,b.netGrid)*0.25,0)/1000;
-  const totalInjBefore  = baseline.reduce((a,b)=>a+Math.max(0,-b.netGrid)*0.25,0)/1000;
-  const totalInjWith    = simBase.reduce((a,b)=>a+Math.max(0,-b.netGrid)*0.25,0)/1000;
-  const mPeakB = monthlyPeaks(baseline, 'netGrid');
-  const mPeakA = monthlyPeaks(simBase, 'netGrid');
-  const avgPeakB = Object.values(mPeakB).reduce((a,b)=>a+b,0)/12;
-  const avgPeakA = Object.values(mPeakA).reduce((a,b)=>a+b,0)/12;
-  const totalCons = baseline.reduce((a,b)=>a+b.cons*0.25,0)/1000;
-  const totalPV   = baseline.reduce((a,b)=>a+b.pv*0.25,0)/1000;
-  const selfConsBefore = totalPV > 0 ? (totalPV - totalInjBefore)/totalPV*100 : 0;
-  const selfConsWith   = totalPV > 0 ? (totalPV - totalInjWith)/totalPV*100 : 0;
-  const cycles = simBase.reduce((a,b)=>a+Math.max(0,-b.battAC)*0.25,0) / (parseFloat(el('batt-cap').value)||215);
-
-  el('res-baseline').innerHTML = mkStatTable([
-    ['Consommation totale', fmt(totalCons,1)+' MWh'],
-    ['Production PV totale', fmt(totalPV,1)+' MWh'],
-    ['Soutirage réseau', fmt(totalConsBefore,1)+' MWh'],
-    ['Injection réseau', fmt(totalInjBefore,1)+' MWh'],
-    ['Pic mensuel moyen', fmt(avgPeakB,0)+' kW'],
-    ['Taux autoconsommation PV', fmt(selfConsBefore,1)+' %'],
-  ]);
-  el('res-withbatt').innerHTML = mkStatTable([
-    ['Soutirage réseau', fmt(totalConsWith,1)+' MWh'],
-    ['Injection réseau', fmt(totalInjWith,1)+' MWh'],
-    ['Pic mensuel moyen', fmt(avgPeakA,0)+' kW'],
-    ['Réduction pic moyen', fmt(avgPeakB-avgPeakA,0)+' kW (-'+fmt((1-avgPeakA/avgPeakB)*100,1)+'%)'],
-    ['Autoconsommation PV', fmt(selfConsWith,1)+' %'],
-    ['Cycles batterie / an', fmt(cycles,0)+' cycles'],
-  ]);
+  // Before / After
+  const tCB=baseline.reduce((a,b)=>a+Math.max(0,b.netGrid)*0.25,0)/1000;
+  const tCA=simB.reduce((a,b)=>a+Math.max(0,b.netGrid)*0.25,0)/1000;
+  const tIB=baseline.reduce((a,b)=>a+Math.max(0,-b.netGrid)*0.25,0)/1000;
+  const tIA=simB.reduce((a,b)=>a+Math.max(0,-b.netGrid)*0.25,0)/1000;
+  const mPB=mPeaks(baseline),mPA=mPeaks(simB);
+  const avgPB=Object.values(mPB).reduce((a,b)=>a+b,0)/Math.max(1,Object.keys(mPB).length);
+  const avgPA=Object.values(mPA).reduce((a,b)=>a+b,0)/Math.max(1,Object.keys(mPA).length);
+  const totalPV=baseline.reduce((a,b)=>a+b.pv*0.25,0)/1000;
+  const selfB=totalPV>0?(totalPV-tIB)/totalPV*100:0,selfA=totalPV>0?(totalPV-tIA)/totalPV*100:0;
+  const cycles=simB.reduce((a,b)=>a+Math.max(0,-b.bAC)*0.25,0)/cap;
+  const mkT=rows=>'<div>'+rows.map(([l,v])=>`<div class="dr"><span class="dl">${l}</span><span class="dv">${v}</span></div>`).join('')+'</div>';
+  el('res-before').innerHTML=mkT([['Soutirage réseau',fmt(tCB,1)+' MWh'],['Injection réseau',fmt(tIB,1)+' MWh'],['Pic mensuel moyen',fmt(avgPB,0)+' kW'],['Autoconsommation PV',fmt(selfB,1)+' %']]);
+  el('res-after').innerHTML=mkT([['Soutirage réseau',fmt(tCA,1)+' MWh'],['Injection réseau',fmt(tIA,1)+' MWh'],['Pic mensuel moyen',fmt(avgPA,0)+' kW'],['Autoconsommation PV',fmt(selfA,1)+' %'],['Réduction pic',fmt(avgPB-avgPA,0)+' kW'],['Cycles batterie/an',fmt(cycles,0)]]);
 
   // Revenue table
-  const total = revBase.total;
-  const rows = [
-    ['⚡ Autoconsommation', revBase.autoconso, '#16a34a'],
-    ['📉 Peak Shaving', revBase.peakShaving, '#2563eb'],
-    ['📈 Arbitrage Day-Ahead', revBase.arbitrage, '#7c3aed'],
-    ['🔄 FCR', revBase.fcr, '#0d9488'],
-    ['⚡ aFRR', revBase.afrr, '#f59e0b'],
-    ['📊 Imbalance', revBase.imbalance, '#6b7280'],
-  ];
-  let revHTML = '<thead><tr><th>Source de revenu</th><th>€/an</th><th>%</th><th style="min-width:120px">Part</th></tr></thead><tbody>';
-  rows.forEach(([label, val, color]) => {
-    const pct = total > 0 ? val/total*100 : 0;
-    revHTML += `<tr><td>${label}</td><td class="pos">${fE(val,0)}</td><td>${fmt(pct,1)} %</td><td><div class="rev-bar"><div class="rev-bar-fill" style="width:${pct}%;background:${color}"></div></div></td></tr>`;
+  const tot=revB.total;
+  const rows=[['⚡ Autoconsommation',revB.autoconso,'#16a34a'],['📉 Peak Shaving',revB.peak,'#2563eb'],['📈 Arbitrage',revB.arb,'#7c3aed'],['🔄 FCR',revB.fcr,'#0d9488'],['⚡ aFRR',revB.afrr,'#f59e0b'],['📊 Imbalance',revB.imbal,'#6b7280']];
+  let rHTML='<thead><tr><th>Source</th><th>€/an</th><th>%</th><th style="min-width:100px">Part</th></tr></thead><tbody>';
+  rows.forEach(([l,v,c])=>{const p=tot>0?v/tot*100:0;rHTML+=`<tr><td>${l}</td><td class="pos">${fE(v,0)}</td><td>${fmt(p,1)}%</td><td><div class="rev-bar-wrap"><div class="rev-bar-fill" style="width:${p}%;background:${c};height:7px;border-radius:4px"></div></div></td></tr>`;});
+  rHTML+=`<tr class="total-row"><td>Total Brut</td><td>${fE(tot,0)}</td><td>100%</td><td></td></tr><tr class="deduct-row"><td>— Frais agrégateurs</td><td>-${fE(finB.aggFees,0)}</td><td></td><td></td></tr><tr class="deduct-row"><td>— OPEX + EMS</td><td>-${fE(getV('fin-opex')+getV('fin-ems'),0)}</td><td></td><td></td></tr><tr class="net-row"><td>Revenus nets à partager</td><td>${fE(finB.netRev,0)}</td><td></td><td></td></tr></tbody>`;
+  el('res-rev-table').innerHTML=rHTML;
+
+  // Scenario compare
+  const scBlock=(f,r,lbl,cls)=>`<div class="scen-col ${cls}"><div class="scen-hdr">${lbl}</div>${[['Revenus bruts',fE(r.total,0)],['FCR + aFRR',fE(r.fcr+r.afrr,0)],['Autoconso + Peak',fE(r.autoconso+r.peak,0)],['Revenus nets',fE(r.total-f.deductions,0)],['Part WGI/an',fE(f.cfs[0],0)],['Part client/an',fE(f.cfsC[0],0)],['TRI WGI',f.irr?fmt(f.irr*100,1)+'%':'n/a'],['VAN',fE(f.npv,0)],['Payback',f.payback?fmt(f.payback,1)+' ans':'n/a']].map(([l,v])=>`<div class="scen-row"><span class="scen-lbl">${l}</span><span class="scen-val">${v}</span></div>`).join('')}</div>`;
+  el('res-scen-compare').innerHTML=scBlock(finC,revC,'🔴 Conservateur','cons')+scBlock(finB,revB,'🔵 Base','base')+scBlock(finO,revO,'🟢 Optimiste','opti');
+
+  // CF table
+  let cfHTML='<thead><tr><th>Année</th><th>Rev. bruts (€)</th><th>Frais (€)</th><th>Part WGI (€)</th><th>Annuité (€)</th><th>CF WGI (€)</th><th>CF client (€)</th><th>Cumulé WGI (€)</th></tr></thead><tbody>';
+  let cum=0;
+  for(let y=1;y<=finB.dur;y++){
+    const inf=Math.pow(1+(getV('fin-inflation')||1.5)/100,y-1);
+    const rev=revB.total*inf,fees=finB.deductions*inf,ann=y<=(parseInt(el('fin-loan-years').value)||7)?finB.annuity:0;
+    const cf=finB.cfs[y-1],cfc=finB.cfsC[y-1];cum+=cf;
+    cfHTML+=`<tr><td>An ${y}</td><td>${fmt(rev,0)}</td><td class="neg">${fmt(fees,0)}</td><td>${fmt((rev-fees)*(getV('fin-wgi-share')/100),0)}</td><td class="neg">${fmt(ann,0)}</td><td class="${cf>=0?'pos':'neg'}">${fmt(cf,0)}</td><td class="${cfc>=0?'pos':'neg'}">${fmt(cfc,0)}</td><td class="${cum>=0?'pos':'neg'}">${fmt(cum,0)}</td></tr>`;
+  }
+  cfHTML+='<tfoot><tr><td>Total</td><td></td><td></td><td></td><td></td><td class="'+( finB.cfTotal>=0?'pos':'neg')+'">'+fmt(finB.cfTotal,0)+'</td><td class="'+( finB.cfsC.reduce((a,b)=>a+b,0)>=0?'pos':'neg')+'">'+fmt(finB.cfsC.reduce((a,b)=>a+b,0),0)+'</td><td></td></tr></tfoot>';
+  el('res-cf-table').innerHTML=cfHTML;
+
+  // NPV summary
+  const npvItems=[{l:'CF Total non actualisé',v:fE(finB.cfTotal,0),c:'var(--gp)'},{l:`VAN (WACC ${el('fin-wacc').value}%)`,v:fE(finB.npv,0),c:'var(--green)'},{l:'Indice de profitabilité',v:fmt(finB.ip,2)+'x',c:'#b45309'},{l:'TRI (IRR)',v:finB.irr?fmt(finB.irr*100,1)+'%':'n/a',c:'var(--teal)'},{l:'Payback CAPEX',v:finB.payback?fmt(finB.payback,1)+' ans':'n/a',c:'#b45309'}];
+  el('res-npv-grid').innerHTML=npvItems.map(({l,v,c})=>`<div style="text-align:center"><div style="font-size:.6rem;color:var(--g400);margin-bottom:3px">${l}</div><div style="font-size:.9rem;font-weight:700;font-family:'DM Mono',monospace;color:${c}">${v}</div></div>`).join('');
+  el('res-npv-note').textContent=`Modèle ${S.finModel} · VAN sur fonds propres WGI (${fE(finB.equity,0)}) · WACC ${el('fin-wacc').value}%`;
+
+  renderMonthly(baseline,simB,revB);
+  renderWeekly(simB,cap);
+}
+
+function renderMonthly(baseline,sim,rev){
+  const ctx=el('chart-monthly').getContext('2d');
+  if(chartMonthly)chartMonthly.destroy();
+  const months=['Jan','Fév','Mar','Avr','Mai','Jun','Jul','Aoû','Sep','Oct','Nov','Déc'];
+  const md=Array.from({length:12},(_,m)=>{
+    const f=(sim.filter(s=>s.ts&&s.ts.getMonth()===m).length||1)/sim.length;
+    return{ac:rev.autoconso*f,pk:rev.peak*f,arb:rev.arb*f,fcr:(rev.fcr+rev.afrr)*f,imb:rev.imbal*f};
   });
-  const netRev = revBase.total - finBase.totalDeductions;
-  revHTML += `<tr class="total-row"><td>Total Brut</td><td>${fE(total,0)}</td><td>100 %</td><td></td></tr>`;
-  revHTML += `<tr class="deduct-row"><td>— Frais agrégateurs</td><td>-${fE(finBase.aggFees,0)}</td><td></td><td></td></tr>`;
-  revHTML += `<tr class="deduct-row"><td>— OPEX + EMS</td><td>-${fE(finBase.opex+finBase.ems,0)}</td><td></td><td></td></tr>`;
-  revHTML += `<tr class="net-row"><td>Revenus nets à partager</td><td>${fE(netRev,0)}</td><td></td><td></td></tr>`;
-  revHTML += '</tbody>';
-  el('res-rev-table').innerHTML = revHTML;
-
-  // Scenario comparison
-  function scenBlock(key, fin, rev, label, cls) {
-    const model = S.finModel;
-    const wgiShare = (parseFloat(el('fin-wgi-share').value)||60)/100;
-    const wgiNet = model === 'tiers' ? rev.total * wgiShare - fin.annuity : rev.total - fin.aggFees - fin.opex - fin.ems;
-    const clientBen = model === 'tiers' ? rev.total * (1-wgiShare) : 0;
-    return `<div class="scen-col ${cls}">
-      <div class="scen-header">${label}</div>
-      <div class="scen-row"><span class="scen-label">Revenus bruts / an</span><span class="scen-val">${fE(rev.total,0)}</span></div>
-      <div class="scen-row"><span class="scen-label">dont FCR + aFRR</span><span class="scen-val">${fE(rev.fcr+rev.afrr,0)}</span></div>
-      <div class="scen-row"><span class="scen-label">Revenus nets (après déd.)</span><span class="scen-val">${fE(rev.total-fin.totalDeductions,0)}</span></div>
-      <div class="scen-row"><span class="scen-label">Part WGI / an</span><span class="scen-val">${fE(fin.cfs[0],0)}</span></div>
-      <div class="scen-row"><span class="scen-label">Part client / an</span><span class="scen-val">${fE(fin.cfsClient[0],0)}</span></div>
-      <div class="scen-row"><span class="scen-label">TRI WGI</span><span class="scen-val">${fin.irr?fmt(fin.irr*100,1)+'%':'n/a'}</span></div>
-      <div class="scen-row"><span class="scen-label">VAN WGI</span><span class="scen-val">${fE(fin.npv,0)}</span></div>
-      <div class="scen-row"><span class="scen-label">Payback</span><span class="scen-val">${fin.paybackGross?fmt(fin.paybackGross,1)+' ans':'n/a'}</span></div>
-    </div>`;
-  }
-  el('res-scen-compare').innerHTML =
-    scenBlock('cons',finCons,revCons,'🔴 Conservateur','cons') +
-    scenBlock('base',finBase,revBase,'🔵 Base','base') +
-    scenBlock('opti',finOpti,revOpti,'🟢 Optimiste','opti');
-
-  // CF Table
-  const dur2 = finBase.duration;
-  let cfHTML = '<thead><tr><th>Année</th><th>Rev. bruts (€)</th><th>Frais (€)</th><th>Part WGI (€)</th><th>Annuité (€)</th><th>CF WGI net (€)</th><th>CF client (€)</th><th>CF cumulé WGI (€)</th></tr></thead><tbody>';
-  let cum = 0;
-  for (let y = 1; y <= dur2; y++) {
-    const loanYrs = parseInt(el('fin-loan-years').value)||7;
-    const infF = Math.pow(1+(parseFloat(el('fin-inflation').value)||1.5)/100, y-1);
-    const rev  = revBase.total * infF;
-    const fees = finBase.totalDeductions * infF;
-    const net  = rev - fees;
-    const cf   = finBase.cfs[y-1];
-    const cfc  = finBase.cfsClient[y-1];
-    const ann  = y <= loanYrs ? finBase.annuity : 0;
-    const wgiP = S.finModel === 'tiers' ? net * (parseFloat(el('fin-wgi-share').value)||60)/100 : net;
-    cum += cf;
-    cfHTML += `<tr><td>An ${y}</td><td>${fmt(rev,0)}</td><td class="neg">${fmt(fees,0)}</td><td>${fmt(wgiP,0)}</td><td class="neg">${fmt(ann,0)}</td><td class="${cf>=0?'pos':'neg'}">${fmt(cf,0)}</td><td class="${cfc>=0?'pos':'neg'}">${fmt(cfc,0)}</td><td class="${cum>=0?'pos':'neg'}">${fmt(cum,0)}</td></tr>`;
-  }
-  cfHTML += `<tfoot><tr><td>Total</td><td></td><td></td><td></td><td></td><td class="${finBase.cfTotal>=0?'pos':'neg'}">${fmt(finBase.cfTotal,0)}</td><td class="${finBase.cfsClient.reduce((a,b)=>a+b,0)>=0?'pos':'neg'}">${fmt(finBase.cfsClient.reduce((a,b)=>a+b,0),0)}</td><td></td></tr></tfoot>`;
-  el('res-cf-table').innerHTML = cfHTML;
-
-  // NPV box
-  const npvItems = [
-    {l:'CF Total non actualisé',v:fE(finBase.cfTotal,0),c:'blue'},
-    {l:'VAN (WACC '+el('fin-wacc').value+'%)',v:fE(finBase.npv,0),c:'green'},
-    {l:'Indice de profitabilité',v:fmt(finBase.profitabilityIndex,2)+'x',c:'gold'},
-    {l:'TRI (IRR)',v:finBase.irr?fmt(finBase.irr*100,1)+'%':'n/a',c:'teal'},
-    {l:'Payback CAPEX',v:finBase.paybackGross?fmt(finBase.paybackGross,1)+' ans':'n/a',c:'gold'},
-  ];
-  el('res-npv-grid').innerHTML = npvItems.map(({l,v,c})=>`<div class="npv-item" style="text-align:center"><div style="font-size:.62rem;color:var(--g400);margin-bottom:3px">${l}</div><div style="font-size:.95rem;font-weight:700;font-family:'DM Mono',monospace;color:var(--${c==='blue'?'gp':c==='green'?'green':c==='gold'?'gold':c==='teal'?'teal':'gp'})">${v}</div></div>`).join('');
-  el('res-npv-note').textContent = `Modèle ${({tiers:'Tiers-investissement',propres:'Fonds propres',leasing:'Leasing'}[S.finModel])} · VAN calculée sur fonds propres WGI (${fE(finBase.equity,0)}) · WACC ${el('fin-wacc').value}%`;
-
-  // Charts
-  renderMonthlyChart(baseline, simBase, revBase);
-  renderWeeklyChart(simBase);
+  chartMonthly=new Chart(ctx,{type:'bar',data:{labels:months,datasets:[{label:'Autoconsommation',data:md.map(d=>d.ac),backgroundColor:'rgba(22,163,74,.7)',stack:'s'},{label:'Peak Shaving',data:md.map(d=>d.pk),backgroundColor:'rgba(37,99,235,.7)',stack:'s'},{label:'Arbitrage',data:md.map(d=>d.arb),backgroundColor:'rgba(124,58,237,.7)',stack:'s'},{label:'FCR+aFRR',data:md.map(d=>d.fcr),backgroundColor:'rgba(13,148,136,.7)',stack:'s'},{label:'Imbalance',data:md.map(d=>d.imb),backgroundColor:'rgba(245,158,11,.7)',stack:'s'}]},options:{responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},plugins:{legend:{position:'top',labels:{font:{family:'Outfit',size:9},boxWidth:9,padding:6}},tooltip:{callbacks:{label:c=>` ${c.dataset.label}: ${fmt(c.raw,0)} €`}}},scales:{x:{stacked:true,ticks:{font:{family:'DM Mono',size:8}},grid:{display:false}},y:{stacked:true,ticks:{font:{family:'DM Mono',size:8},callback:v=>fmt(v,0)}}}}});
 }
 
-function mkStatTable(rows) {
-  return '<div style="display:flex;flex-direction:column;gap:0">' +
-    rows.map(([l,v])=>`<div class="dr"><span class="dl">${l}</span><span class="dv">${v}</span></div>`).join('') +
-    '</div>';
+function renderWeekly(sim,cap){
+  const ctx=el('chart-weekly').getContext('2d');
+  if(chartWeekly)chartWeekly.destroy();
+  const w=sim.filter(s=>s.ts&&s.ts.getMonth()===5).slice(0,96*7);
+  if(w.length<96)return;
+  chartWeekly=new Chart(ctx,{type:'line',data:{labels:w.map((_,i)=>i),datasets:[{label:'Conso (kW)',data:w.map(s=>s.cons),borderColor:'rgba(37,99,235,.7)',borderWidth:1.5,pointRadius:0,fill:false},{label:'Net réseau (kW)',data:w.map(s=>s.netGrid),borderColor:'rgba(22,163,74,.7)',borderWidth:1,pointRadius:0,fill:false},{label:'Batterie (kW)',data:w.map(s=>s.bAC),borderColor:'rgba(245,158,11,.9)',borderWidth:1.5,pointRadius:0,fill:true,backgroundColor:'rgba(245,158,11,.1)',yAxisID:'y'},{label:'SoC (%)',data:w.map(s=>s.soc/cap*100),borderColor:'rgba(124,58,237,.6)',borderWidth:1,pointRadius:0,fill:false,yAxisID:'y2'}]},options:{responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},plugins:{legend:{position:'top',labels:{font:{family:'Outfit',size:9},boxWidth:9,padding:6}},tooltip:{enabled:false}},scales:{x:{display:false},y:{ticks:{font:{family:'DM Mono',size:8},callback:v=>fmt(v,0)}},y2:{position:'right',min:0,max:100,ticks:{font:{family:'DM Mono',size:8},callback:v=>v+'%'},grid:{drawOnChartArea:false}}}}});
 }
 
-function renderMonthlyChart(baseline, simBase, rev) {
-  const ctx = el('chart-monthly-rev').getContext('2d');
-  if (chartMonthly) chartMonthly.destroy();
+function exportCSV(){
+  if(!S.simResults)return;
+  const {revC,revB,revO,finB}=S.simResults;
+  const rows=['Résultats BESS WGI','','Scénario,Revenus bruts,FCR+aFRR,Autoconso+Peak,Revenus nets',`Conservateur,${fmt(revC.total)},${fmt(revC.fcr+revC.afrr)},${fmt(revC.autoconso+revC.peak)},${fmt(revC.total-S.simResults.finC.deductions)}`,`Base,${fmt(revB.total)},${fmt(revB.fcr+revB.afrr)},${fmt(revB.autoconso+revB.peak)},${fmt(revB.total-finB.deductions)}`,`Optimiste,${fmt(revO.total)},${fmt(revO.fcr+revO.afrr)},${fmt(revO.autoconso+revO.peak)},${fmt(revO.total-S.simResults.finO.deductions)}`,'','Cash Flows annuels (Base)','Année,CF WGI,CF Client',...finB.cfs.map((c,i)=>`${i+1},${fmt(c)},${fmt(finB.cfsC[i])}`),`VAN,${fmt(finB.npv)}`,`TRI,${finB.irr?fmt(finB.irr*100,2):'n/a'}%`,`Payback,${finB.payback?fmt(finB.payback,2):'n/a'} ans`];
+  const b=new Blob([rows.join('\n')],{type:'text/csv;charset=utf-8;'});
+  const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='WGI_BESS_v2.csv';a.click();
+}
 
-  // Monthly revenues (simplified: distribute annual by weight of each month's contribution)
-  const months = ['Jan','Fév','Mar','Avr','Mai','Jun','Jul','Aoû','Sep','Oct','Nov','Déc'];
-  const monthlyData = Array.from({length:12}, (_,m) => {
-    const mSlots = simBase.filter(s => s.ts && s.ts.getMonth()===m);
-    const baseMSlots = baseline.filter(s => s.ts && s.ts.getMonth()===m);
-    if (!mSlots.length) return {ac:0,peak:0,arb:0,fcr:0};
-    const frac = mSlots.length / simBase.length;
-    return {
-      ac:   rev.autoconso * frac,
-      peak: rev.peakShaving * frac,
-      arb:  rev.arbitrage * frac,
-      fcr:  (rev.fcr + rev.afrr) * frac,
-      imb:  rev.imbalance * frac,
+// ═══════════════════════ FILE UPLOAD HANDLERS ═══════════════════════
+function setInputMode(section, mode, btn) {
+  const container = btn.closest('.input-mode-tabs').parentElement;
+  container.querySelectorAll('.imt').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  const pasteEl = el(section + '-paste-mode');
+  const fileEl  = el(section + '-file-mode');
+  if (pasteEl) pasteEl.style.display = mode === 'paste' ? '' : 'none';
+  if (fileEl)  fileEl.style.display  = mode === 'file'  ? '' : 'none';
+}
+
+function handleDrag(e, zone) {
+  e.preventDefault();
+  zone.classList.add('drag');
+}
+function handleDragLeave(zone) {
+  zone.classList.remove('drag');
+}
+function handleDrop(e, section) {
+  e.preventDefault();
+  const zone = el(section + '-upload-zone');
+  zone.classList.remove('drag');
+  const file = e.dataTransfer.files[0];
+  if (file) processFile(file, section);
+}
+function handleFileUpload(e, section) {
+  const file = e.target.files[0];
+  if (file) processFile(file, section);
+}
+
+function processFile(file, section) {
+  const ext = file.name.split('.').pop().toLowerCase();
+  const zoneText = el(section + '-upload-text');
+  if (zoneText) zoneText.textContent = `⏳ Chargement de "${file.name}"...`;
+
+  const reader = new FileReader();
+
+  if (ext === 'csv') {
+    reader.onload = e => {
+      const text = e.target.result;
+      processTextData(text, section, file.name);
     };
-  });
-
-  chartMonthly = new Chart(ctx, {
-    type:'bar',
-    data:{
-      labels: months,
-      datasets:[
-        {label:'Autoconsommation',data:monthlyData.map(d=>d.ac),backgroundColor:'rgba(22,163,74,.7)',stack:'s'},
-        {label:'Peak Shaving',data:monthlyData.map(d=>d.peak),backgroundColor:'rgba(37,99,235,.7)',stack:'s'},
-        {label:'Arbitrage',data:monthlyData.map(d=>d.arb),backgroundColor:'rgba(124,58,237,.7)',stack:'s'},
-        {label:'FCR + aFRR',data:monthlyData.map(d=>d.fcr),backgroundColor:'rgba(13,148,136,.7)',stack:'s'},
-        {label:'Imbalance',data:monthlyData.map(d=>d.imb),backgroundColor:'rgba(245,158,11,.7)',stack:'s'},
-      ]
-    },
-    options:{
-      responsive:true,maintainAspectRatio:false,
-      interaction:{mode:'index',intersect:false},
-      plugins:{legend:{position:'top',labels:{font:{family:'Outfit',size:9},boxWidth:9,padding:7}},
-        tooltip:{callbacks:{label:c=>` ${c.dataset.label}: ${fmt(c.raw,0)} €`}}},
-      scales:{
-        x:{stacked:true,ticks:{font:{family:'DM Mono',size:9}},grid:{display:false}},
-        y:{stacked:true,ticks:{font:{family:'DM Mono',size:9},callback:v=>fmt(v,0)},title:{display:true,text:'€/mois',font:{size:9}}}
+    reader.readAsText(file, 'UTF-8');
+  } else if (ext === 'xlsx' || ext === 'xls' || ext === 'ods') {
+    reader.onload = e => {
+      try {
+        const wb = XLSX.read(e.target.result, { type: 'array', cellDates: true });
+        const ws = wb.Sheets[wb.SheetNames[0]];
+        // Convert to CSV-like text for unified processing
+        const csv = XLSX.utils.sheet_to_csv(ws, { FS: '\t', RS: '\n' });
+        processTextData(csv, section, file.name);
+      } catch(err) {
+        alert('Erreur lecture fichier Excel : ' + err.message);
       }
-    }
-  });
-}
-
-function renderWeeklyChart(sim) {
-  const ctx = el('chart-weekly').getContext('2d');
-  if (chartWeekly) chartWeekly.destroy();
-
-  // Find a representative week (mid-year, week 26)
-  const target = sim.filter(s => s.ts && s.ts.getMonth() === 5).slice(0, 96*7);
-  if (target.length < 96) {
-    el('chart-weekly').getContext('2d').fillText('Données insuffisantes', 50, 100);
+    };
+    reader.readAsArrayBuffer(file);
+  } else {
+    alert('Format non supporté. Utilisez .xlsx, .xls ou .csv');
     return;
   }
-  const labels = target.map((_,i) => {
-    const h = (i%96)*0.25;
-    const d = Math.floor(i/96);
-    return d===0&&h===0?'Lun 0h':(h===0?['Mar','Mer','Jeu','Ven','Sam','Dim'][d-1]||'':h===12?`${d*24+12}h`:'');
-  });
-
-  chartWeekly = new Chart(ctx, {
-    type:'line',
-    data:{
-      labels:target.map((_,i)=>i),
-      datasets:[
-        {label:'Consommation (kW)',data:target.map(s=>s.cons),borderColor:'rgba(37,99,235,.7)',borderWidth:1.5,pointRadius:0,fill:false,yAxisID:'y'},
-        {label:'Net réseau (kW)',data:target.map(s=>s.netGrid),borderColor:'rgba(22,163,74,.7)',borderWidth:1,pointRadius:0,fill:false,yAxisID:'y'},
-        {label:'Batterie (kW)',data:target.map(s=>s.battAC),borderColor:'rgba(245,158,11,.9)',borderWidth:1.5,pointRadius:0,fill:true,backgroundColor:'rgba(245,158,11,.1)',yAxisID:'y'},
-        {label:'SoC (%)',data:target.map(s=>(s.soc/(parseFloat(el('batt-cap').value)||215)*100)),borderColor:'rgba(124,58,237,.6)',borderWidth:1,pointRadius:0,fill:false,yAxisID:'y2'},
-      ]
-    },
-    options:{
-      responsive:true,maintainAspectRatio:false,
-      interaction:{mode:'index',intersect:false},
-      plugins:{legend:{position:'top',labels:{font:{family:'Outfit',size:9},boxWidth:9,padding:7}},
-        tooltip:{enabled:false}},
-      scales:{
-        x:{display:false},
-        y:{ticks:{font:{family:'DM Mono',size:8},callback:v=>fmt(v,0)},title:{display:true,text:'kW',font:{size:9}}},
-        y2:{position:'right',min:0,max:100,ticks:{font:{family:'DM Mono',size:8},callback:v=>v+'%'},grid:{drawOnChartArea:false}}
-      }
-    }
-  });
 }
 
-// Export
-function exportResults() {
-  if (!S.simResults) return;
-  const { revCons, revBase, revOpti, finBase } = S.simResults;
-  const lines = [
-    'Résultats BESS WGI',
-    '',
-    'Scénario,Revenus bruts (€/an),FCR+aFRR (€/an),Peak shaving (€/an),Autoconsommation (€/an),Revenus nets (€/an)',
-    `Conservateur,${fmt(revCons.total,0)},${fmt(revCons.fcr+revCons.afrr,0)},${fmt(revCons.peakShaving,0)},${fmt(revCons.autoconso,0)},${fmt(revCons.total-S.simResults.finCons.totalDeductions,0)}`,
-    `Base,${fmt(revBase.total,0)},${fmt(revBase.fcr+revBase.afrr,0)},${fmt(revBase.peakShaving,0)},${fmt(revBase.autoconso,0)},${fmt(revBase.total-finBase.totalDeductions,0)}`,
-    `Optimiste,${fmt(revOpti.total,0)},${fmt(revOpti.fcr+revOpti.afrr,0)},${fmt(revOpti.peakShaving,0)},${fmt(revOpti.autoconso,0)},${fmt(revOpti.total-S.simResults.finOpti.totalDeductions,0)}`,
-    '',
-    'Cash Flows annuels (scénario Base)',
-    'Année,CF WGI (€),CF Client (€)',
-    ...finBase.cfs.map((cf,i) => `${i+1},${fmt(cf,0)},${fmt(finBase.cfsClient[i],0)}`),
-    '',
-    `VAN,${fmt(finBase.npv,0)},€`,
-    `TRI,${finBase.irr?fmt(finBase.irr*100,2):'n/a'},%`,
-    `Payback,${finBase.paybackGross?fmt(finBase.paybackGross,2):'n/a'},ans`,
-  ];
-  const blob = new Blob([lines.join('\n')], {type:'text/csv;charset=utf-8;'});
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = 'WGI_BESS_results.csv';
-  a.click();
+function processTextData(text, section, filename) {
+  const zone = el(section + '-upload-zone');
+  const zoneText = el(section + '-upload-text');
+
+  if (section === 'conso') {
+    el('paste-conso').value = text;
+    if (zoneText) zoneText.textContent = `✓ "${filename}" chargé — analyse en cours...`;
+    if (zone) zone.classList.add('loaded');
+    parseConso();
+  } else if (section === 'spot') {
+    el('paste-spot').value = text;
+    if (zoneText) zoneText.textContent = `✓ "${filename}" chargé`;
+    if (zone) zone.classList.add('loaded');
+    parseSpot();
+  } else if (section === 'pv') {
+    el('paste-pv-data').value = text;
+    if (zoneText) zoneText.textContent = `✓ "${filename}" chargé`;
+    if (zone) zone.classList.add('loaded');
+    parsePVData();
+  }
 }
 
 // Init
-updateCapexRecap();
+updateCapex();updateBadge();
 </script>
 </body>
 </html>
