@@ -7,6 +7,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet"/>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <style>
 :root{
   --gd:#0d1f3c;--gp:#1a3a6b;--gm:#2563eb;--gl:#3b82f6;--gpa:#eff6ff;
@@ -481,25 +482,47 @@ footer{text-align:center;padding:12px;font-size:.63rem;color:var(--g400)}
     <!-- PASTE MODE -->
     <div id="pv-paste" class="pv-mode-panel hidden">
       <div class="card">
-        <div class="ch"><div class="ico">📋</div><h2>Données PV mesurées — quarts horaires</h2></div>
+        <div class="ch"><div class="ico">📊</div><h2>Données de production PV — import</h2></div>
         <div class="cb">
-          <div class="ib" style="margin-bottom:10px">Colonnes : <strong>Timestamp</strong> + <strong>Production [kW ou kWh]</strong>.</div>
           <div class="input-mode-tabs">
-            <button class="imt active" onclick="setInputMode('pv','paste',this)">📋 Coller</button>
-            <button class="imt" onclick="setInputMode('pv','file',this)">📂 Fichier Excel</button>
+            <button class="imt active" onclick="setInputMode('pv','paste',this)">📋 Coller (quarts horaires)</button>
+            <button class="imt" onclick="setInputMode('pv','file',this)">📂 Fichier Excel / CSV</button>
+            <button class="imt" onclick="setInputMode('pv','pdf',this)">📄 Rapport PDF (Archelios / Helioscope)</button>
           </div>
+
+          <!-- PASTE MODE -->
           <div id="pv-paste-mode">
+            <div class="ib" style="margin-bottom:8px">Colonnes : <strong>Timestamp</strong> + <strong>Production [kW ou kWh/15min]</strong>. Séparateur auto-détecté.</div>
             <textarea class="paste-area" id="paste-pv-data" placeholder="Timestamp;Production PV [kWh]&#10;01/01/2023 00:15;0.000&#10;..."></textarea>
             <div style="margin-top:9px"><button class="btn btn-primary" onclick="parsePVData()">🔍 Analyser</button></div>
           </div>
+
+          <!-- FILE MODE -->
           <div id="pv-file-mode" style="display:none">
+            <div class="ib" style="margin-bottom:8px">Formats acceptés : <strong>.xlsx, .xls, .csv</strong>. Colonnes Timestamp + Production.</div>
             <div class="upload-zone" id="pv-upload-zone" ondragover="handleDrag(event,this)" ondragleave="handleDragLeave(this)" ondrop="handleDrop(event,'pv')">
               <input type="file" accept=".xlsx,.xls,.csv" onchange="handleFileUpload(event,'pv')"/>
-              <div class="uz-icon">☀️</div>
+              <div class="uz-icon">📊</div>
               <div class="uz-text" id="pv-upload-text">Glisser-déposer votre fichier PV ici</div>
               <div class="uz-sub">ou cliquer pour parcourir · .xlsx .xls .csv</div>
             </div>
           </div>
+
+          <!-- PDF MODE -->
+          <div id="pv-pdf-mode" style="display:none">
+            <div class="ib" style="margin-bottom:8px">
+              Glissez un rapport <strong>Archelios Pro</strong> ou <strong>Helioscope / Aurora Solar</strong>.<br/>
+              Les 12 productions mensuelles (kWh) sont extraites automatiquement et redistribuées en profil quart-horaire réaliste.
+            </div>
+            <div class="upload-zone" id="pdf-pv-zone" ondragover="handleDrag(event,this)" ondragleave="handleDragLeave(this)" ondrop="handlePDFDrop(event)">
+              <input type="file" accept=".pdf" onchange="handlePDFUpload(event)"/>
+              <div class="uz-icon">📄</div>
+              <div class="uz-text" id="pdf-pv-text">Glisser-déposer rapport Archelios ou Helioscope (.pdf)</div>
+              <div class="uz-sub">Extraction automatique des productions mensuelles · Traitement 100% local</div>
+            </div>
+            <div class="ib" id="pdf-pv-result" style="margin-top:8px;display:none"></div>
+          </div>
+
           <div class="chips" id="stats-pv-paste" style="margin-top:8px"></div>
         </div>
       </div>
@@ -625,9 +648,18 @@ footer{text-align:center;padding:12px;font-size:.63rem;color:var(--g400)}
             <div class="g2">
               <div class="f"><label>% Batterie réservé aFRR</label><div class="ir"><input type="number" id="cons-afrr-frac" value="0" min="0" max="100" step="5"/><div class="iu">%</div></div></div>
               <div class="f"><label>Disponibilité</label><div class="ir"><input type="number" id="cons-afrr-avail" value="85" min="0" max="100" step="1"/><div class="iu">%</div></div></div>
-              <div class="f"><label>Prix aFRR retenu</label><div class="ir"><input type="number" id="cons-afrr-price" value="8" min="0" max="200" step="0.5"/><div class="iu">€/MW/h</div></div></div>
+              <div class="f"><label>Prix aFRR retenu</label><div class="ir"><input type="number" id="cons-afrr-price" value="6" min="0" max="200" step="0.5"/><div class="iu">€/MW/h</div></div></div>
               <div class="f"><label>Commission agrégateur</label><div class="ir"><input type="number" id="cons-afrr-agg" value="38" min="0" max="60" step="1"/><div class="iu">%</div></div></div>
             </div>
+            <table class="fcr-hist" style="margin-top:6px"><thead><tr><th>Année</th><th>Prix aFRR Belgique (€/MW/h)</th><th>Contexte</th></tr></thead>
+            <tbody>
+              <tr><td>2021</td><td>~4–8</td><td style="font-size:.62rem;color:var(--g500)">Marché nascent, prix bas</td></tr>
+              <tr><td>2022</td><td>~10–18</td><td style="font-size:.62rem;color:var(--g500)">Crise énergie, volatilité haute</td></tr>
+              <tr><td>2023</td><td>~8–14</td><td style="font-size:.62rem;color:var(--g500)">Normalisation progressive</td></tr>
+              <tr><td>2024</td><td>~10–16</td><td style="font-size:.62rem;color:var(--g500)">Forte activité batteries</td></tr>
+              <tr class="fcr-active"><td>2025</td><td>~6–10</td><td style="font-size:.62rem;color:var(--g500)">Pression concurrentielle</td></tr>
+            </tbody></table>
+            <div class="ib" style="margin-top:6px;font-size:.68rem">⚠️ Données aFRR indicatives — moins publiées que FCR. Ajuster selon retour agrégateur.</div>
           </div>
         </div>
       </div>
@@ -675,6 +707,12 @@ footer{text-align:center;padding:12px;font-size:.63rem;color:var(--g400)}
               <div class="f"><label>Prix aFRR retenu</label><div class="ir"><input type="number" id="base-afrr-price" value="12" min="0" max="200" step="0.5"/><div class="iu">€/MW/h</div></div></div>
               <div class="f"><label>Commission agrégateur</label><div class="ir"><input type="number" id="base-afrr-agg" value="35" min="0" max="60" step="1"/><div class="iu">%</div></div></div>
             </div>
+            <table class="fcr-hist" style="margin-top:6px"><thead><tr><th>Année</th><th>Prix aFRR indicatif (€/MW/h)</th></tr></thead>
+            <tbody>
+              <tr><td>2021</td><td>~4–8</td></tr><tr><td>2022</td><td>~10–18</td></tr>
+              <tr><td>2023</td><td>~8–14</td></tr><tr><td>2024</td><td>~10–16</td></tr>
+              <tr class="fcr-active"><td>2025</td><td>~6–10</td></tr>
+            </tbody></table>
           </div>
         </div>
       </div>
@@ -721,6 +759,12 @@ footer{text-align:center;padding:12px;font-size:.63rem;color:var(--g400)}
               <div class="f"><label>Prix aFRR retenu</label><div class="ir"><input type="number" id="opti-afrr-price" value="18" min="0" max="200" step="0.5"/><div class="iu">€/MW/h</div></div></div>
               <div class="f"><label>Commission agrégateur</label><div class="ir"><input type="number" id="opti-afrr-agg" value="30" min="0" max="60" step="1"/><div class="iu">%</div></div></div>
             </div>
+            <table class="fcr-hist" style="margin-top:6px"><thead><tr><th>Année</th><th>Prix aFRR indicatif (€/MW/h)</th></tr></thead>
+            <tbody>
+              <tr><td>2021</td><td>~4–8</td></tr><tr><td>2022</td><td>~10–18</td></tr>
+              <tr><td>2023</td><td>~8–14</td></tr><tr class="fcr-active"><td>2024</td><td>~10–16</td></tr>
+              <tr><td>2025</td><td>~6–10</td></tr>
+            </tbody></table>
           </div>
         </div>
       </div>
@@ -777,19 +821,30 @@ footer{text-align:center;padding:12px;font-size:.63rem;color:var(--g400)}
       </div>
 
       <div class="card" id="fin-tiers-card">
-        <div class="ch"><div class="ico">🤝</div><h2>Partage des revenus (Tiers-Invest)</h2></div>
+        <div class="ch"><div class="ico">🤝</div><h2>Tiers-investissement — Waterfall contractuel</h2></div>
         <div class="cb">
-          <div class="ib" style="margin-bottom:8px">
-            Revenus nets = Total brut − Frais agrégateurs − EMS − OPEX<br/>
-            WGI déduit ensuite les coûts de financement de sa part.
+          <div class="ib" style="margin-bottom:10px;background:#fff7ed;border-color:var(--orange);color:#9a3412">
+            <strong>Waterfall contractuel (Art. 4.3) :</strong><br/>
+            ① Revenus bruts (toutes sources)<br/>
+            ② − Frais agrégateurs (FCR/aFRR/Imbalance/Arbitrage)<br/>
+            ③ − Amortissement CAPEX WGI (taux contractuel × durée contrat)<br/>
+            ④ − Coûts opérationnels (OPEX, EMS, assurances)<br/>
+            ⑤ = <strong>Revenus nets</strong> → WGI 60% / Client 40%<br/>
+            <strong>Protection client</strong> : part client plancher à 0 — si nets ≤ 0, WGI absorbe tout.
           </div>
           <div class="g2">
-            <div class="f"><label>Part WGI (revenus nets)</label><div class="ir"><input type="number" id="fin-wgi-share" value="60" min="1" max="99" step="1"/><div class="iu">%</div></div></div>
+            <div class="f"><label>Part WGI (% des revenus nets)</label><div class="ir"><input type="number" id="fin-wgi-share" value="60" min="1" max="99" step="1"/><div class="iu">%</div></div></div>
             <div class="f"><label>Part Client</label><div class="ir"><input type="number" id="fin-client-disp" value="40" disabled/><div class="iu">%</div></div></div>
-            <div class="f"><label>% Financement bancaire</label><div class="ir"><input type="number" id="fin-debt-ratio" value="70" min="0" max="100" step="1"/><div class="iu">%</div></div></div>
+          </div>
+          <div class="sec">Financement WGI (interne)</div>
+          <div class="ib" style="margin-bottom:8px;font-size:.68rem">Le taux d'amortissement contractuel (7,5%) est appliqué sur le CAPEX total. La différence entre taux contractuel et taux bancaire réel constitue la marge WGI.</div>
+          <div class="g2">
+            <div class="f"><label>Taux amortissement contractuel</label><div class="ir"><input type="number" id="fin-contract-rate" value="7.5" min="0" max="20" step="0.5"/><div class="iu">%/an</div></div></div>
+            <div class="f"><label>Durée amortissement</label><div class="ir"><input type="number" id="fin-amort-years" value="15" step="1" min="5" max="25"/><div class="iu">ans (= durée contrat)</div></div></div>
+            <div class="f"><label>% Financement bancaire WGI</label><div class="ir"><input type="number" id="fin-debt-ratio" value="70" min="0" max="100" step="1"/><div class="iu">%</div></div></div>
             <div class="f"><label>% Fonds propres WGI</label><div class="ir"><input type="number" id="fin-equity-disp" value="30" disabled/><div class="iu">%</div></div></div>
-            <div class="f"><label>Taux intérêt bancaire</label><div class="ir"><input type="number" id="fin-loan-rate" value="4.5" step="0.1"/><div class="iu">%/an</div></div></div>
-            <div class="f"><label>Durée prêt</label><div class="ir"><input type="number" id="fin-loan-years" value="7" step="1"/><div class="iu">ans</div></div></div>
+            <div class="f"><label>Taux intérêt bancaire réel</label><div class="ir"><input type="number" id="fin-loan-rate" value="4.5" step="0.1"/><div class="iu">%/an</div></div></div>
+            <div class="f"><label>Durée prêt bancaire</label><div class="ir"><input type="number" id="fin-loan-years" value="7" step="1"/><div class="iu">ans</div></div></div>
           </div>
         </div>
       </div>
@@ -985,7 +1040,8 @@ document.querySelectorAll('.msb').forEach(b=>{
 // Share sync
 el('fin-wgi-share').addEventListener('input',()=>el('fin-client-disp').value=100-(parseFloat(el('fin-wgi-share').value)||0));
 el('fin-debt-ratio').addEventListener('input',()=>{el('fin-equity-disp').value=100-(parseFloat(el('fin-debt-ratio').value)||0);updateCapex();});
-['fin-capex-batt','fin-capex-install','fin-capex-recycle','fin-capex-subsidy','fin-debt-ratio','fin-loan-rate','fin-loan-years'].forEach(id=>el(id).addEventListener('input',updateCapex));
+['fin-capex-batt','fin-capex-install','fin-capex-recycle','fin-capex-subsidy','fin-debt-ratio','fin-loan-rate','fin-loan-years'].forEach(id=>{if(el(id))el(id).addEventListener('input',updateCapex);});
+el('fin-duration').addEventListener('input',()=>{if(el('fin-amort-years'))el('fin-amort-years').value=el('fin-duration').value;updateCapex();});
 ['p-hp-start','p-hp-end'].forEach(id=>el(id).addEventListener('input',()=>el('hp-disp').textContent=(el('p-hp-start').value||7)+'h à '+(el('p-hp-end').value||22)+'h'));
 
 function updateCapex(){
@@ -1582,43 +1638,60 @@ function mPeaks(slots){
 function getV(id){return parseFloat(el(id)?.value)||0;}
 
 function calcFin(rev){
-  const cap=(parseFloat(el('fin-capex-batt').value)||0)+(parseFloat(el('fin-capex-install').value)||0)+(parseFloat(el('fin-capex-recycle').value)||0)-(parseFloat(el('fin-capex-subsidy').value)||0);
+  const capex=(parseFloat(el('fin-capex-batt').value)||0)+(parseFloat(el('fin-capex-install').value)||0)+(parseFloat(el('fin-capex-recycle').value)||0)-(parseFloat(el('fin-capex-subsidy').value)||0);
   const opex=getV('fin-opex'),ems=getV('fin-ems');
   const wacc=getV('fin-wacc')/100,dur=parseInt(el('fin-duration').value)||15;
   const infla=getV('fin-inflation')/100;
-  const dr=getV('fin-debt-ratio')/100,lr=getV('fin-loan-rate')/100,ly=parseInt(el('fin-loan-years').value)||7;
-  const equity=cap*(1-dr),debt=cap*dr;
-  const annuity=debt>0?pmt(lr,ly,debt):0;
+  const dr=getV('fin-debt-ratio')/100;
+  const equity=capex*(1-dr),debt=capex*dr;
+  const lr=getV('fin-loan-rate')/100,ly=parseInt(el('fin-loan-years').value)||7;
+  const realAnnuity=debt>0?pmt(lr,ly,debt):0;
   const wgiShare=getV('fin-wgi-share')/100;
-  // Aggregator fees (base scenario values)
+  // Contractual amortization rate (Art 4.3) — deducted BEFORE split
+  const contractRate=(el('fin-contract-rate')?getV('fin-contract-rate'):7.5)/100;
+  const amortYrs=el('fin-amort-years')?(parseInt(el('fin-amort-years').value)||dur):dur;
+  const contractualDeduction=capex>0?pmt(contractRate,amortYrs,capex):0;
+  // Aggregator fees
   const fcrAgg=getV('base-fcr-agg')/100,afrAgg=getV('base-afrr-agg')/100;
   const gridRevs=rev.fcr+rev.afrr+rev.imbal+rev.arb;
   const aggFees=gridRevs*Math.max(fcrAgg,afrAgg);
-  const deductions=aggFees+opex+ems;
-  const netRev=Math.max(0,rev.total-deductions);
+  const totalDeductions=aggFees+contractualDeduction+opex+ems;
+  const netRev0=rev.total-totalDeductions; // can be negative
 
-  const cfs=[],cfsC=[];
+  const cfs=[],cfsC=[],netRevs=[];
   for(let y=1;y<=dur;y++){
     const inf=Math.pow(1+infla,y-1);
-    const net=netRev*inf;
+    const bruts=rev.total*inf;
+    const agg=aggFees*inf, opsD=(opex+ems)*inf;
+    const nets=bruts-agg-contractualDeduction-opsD;
+    netRevs.push(nets);
     if(S.finModel==='tiers'){
-      cfs.push(net*wgiShare-(y<=ly?annuity:0));
-      cfsC.push(net*(1-wgiShare));
+      // Client floor = 0; if nets<=0, WGI absorbs all
+      const clientCF=Math.max(0,nets*(1-wgiShare));
+      const wgiOps=nets>0?nets*wgiShare:(bruts-agg-opsD); // all if nets<=0
+      const bankPay=y<=ly?realAnnuity:0;
+      cfs.push(wgiOps-bankPay); cfsC.push(clientCF);
     } else if(S.finModel==='propres'){
-      const cf=(rev.total-aggFees-opex-ems)*inf;
+      const cf=(bruts-agg-opsD);
       cfs.push(cf);cfsC.push(cf);
     } else {
       const lease=getV('fin-lease-annual');
-      cfs.push(lease-(y<=ly?annuity:0));
-      cfsC.push((rev.total-aggFees-opex-ems)*inf-lease);
+      const bankPay=y<=ly?realAnnuity:0;
+      cfs.push(lease-bankPay);
+      cfsC.push(bruts-agg-opsD-lease);
     }
   }
   const cfTotal=cfs.reduce((a,b)=>a+b,0),cfMoy=cfTotal/dur;
-  let npv=-equity;cfs.forEach((c,i)=>npv+=c/Math.pow(1+wacc,i+1));
-  const invBase=S.finModel==='tiers'?equity:cap;
+  const invBase=S.finModel==='tiers'?equity:capex;
+  let npv=-invBase;cfs.forEach((c,i)=>npv+=c/Math.pow(1+wacc,i+1));
   const irrV=irrCalc(invBase,cfs);
-  const payback=(() => {let cum=0,cp=0;for(let i=0;i<cfs.length;i++){const cn=cp+(rev.fcr+rev.afrr+rev.arb+rev.autoconso+rev.peak)*Math.pow(1+infla,i);if(cn>=cap&&cum==null)return i+(cap-cp)/(cn-cp);cp=cn;}return null;})();
-  return {cap,equity,debt,annuity,rev,deductions,aggFees,netRev,cfs,cfsC,cfTotal,cfMoy,npv,irr:irrV,payback:cap>0?cap/(rev.total-deductions):null,ip:invBase>0?(npv+invBase)/invBase:0,dur,wgiShare};
+  // Payback: cumulative (bruts - agg - opsD) >= capex
+  const payback=(()=>{let cp=0;for(let i=0;i<cfs.length;i++){const inf=Math.pow(1+infla,i);const net=(rev.total-aggFees-opex-ems)*inf;cp+=net;if(cp>=capex)return i+(capex-(cp-net))/net;}return null;})();
+  return {capex,cap:capex,equity,debt,realAnnuity,contractualDeduction,rev,
+    aggFees,opex,ems,totalDeductions,netRev:netRev0,
+    cfs,cfsC,cfTotal,cfMoy,npv,irr:irrV,payback,
+    ip:invBase>0?(npv+invBase)/invBase:0,dur,wgiShare,netRevs,
+    annuity:realAnnuity};
 }
 
 // ═══════════════════════ RUN SIMULATION ═══════════════════════
@@ -1746,8 +1819,10 @@ function setInputMode(section, mode, btn) {
   btn.classList.add('active');
   const pasteEl = el(section + '-paste-mode');
   const fileEl  = el(section + '-file-mode');
+  const pdfEl   = el(section + '-pdf-mode');
   if (pasteEl) pasteEl.style.display = mode === 'paste' ? '' : 'none';
   if (fileEl)  fileEl.style.display  = mode === 'file'  ? '' : 'none';
+  if (pdfEl)   pdfEl.style.display   = mode === 'pdf'   ? '' : 'none';
 }
 
 function handleDrag(e, zone) {
@@ -1821,6 +1896,190 @@ function processTextData(text, section, filename) {
     if (zone) zone.classList.add('loaded');
     parsePVData();
   }
+}
+
+// ═══════════════════════ PDF IMPORT (Helioscope / Archelios) ═══════════════════════
+// Configure PDF.js worker
+if (typeof pdfjsLib !== 'undefined') {
+  pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+}
+
+function handlePDFDrop(e) {
+  e.preventDefault();
+  const zone = el('pdf-pv-zone');
+  zone.classList.remove('drag');
+  const file = e.dataTransfer.files[0];
+  if (file && file.type === 'application/pdf') parsePVFromPDF(file);
+  else alert('Veuillez déposer un fichier PDF.');
+}
+function handlePDFUpload(e) {
+  const file = e.target.files[0];
+  if (file) parsePVFromPDF(file);
+}
+
+async function parsePVFromPDF(file) {
+  const zone = el('pdf-pv-zone');
+  const txt = el('pdf-pv-text');
+  const res = el('pdf-pv-result');
+  zone.classList.add('drag');
+  txt.textContent = `⏳ Lecture de "${file.name}"...`;
+  res.style.display = 'none';
+
+  try {
+    const arrayBuffer = await file.arrayBuffer();
+    const pdf = await pdfjsLib.getDocument({data: arrayBuffer}).promise;
+    let fullText = '';
+    for (let p = 1; p <= pdf.numPages; p++) {
+      const page = await pdf.getPage(p);
+      const content = await page.getTextContent();
+      fullText += content.items.map(i => i.str).join(' ') + '\n';
+    }
+    const monthly = extractMonthlyFromPDF(fullText, file.name);
+    if (!monthly) {
+      txt.textContent = '❌ Format non reconnu';
+      res.style.display = 'block';
+      res.innerHTML = '⚠️ Impossible d\'extraire les productions mensuelles. Vérifiez que le PDF est un rapport Helioscope ou Archelios complet.';
+      res.style.background = '#fff7ed'; res.style.borderColor = 'var(--orange)'; res.style.color = '#9a3412';
+      zone.classList.remove('drag');
+      return;
+    }
+    // Generate 15-min slots from monthly totals
+    const slots = generateSlotsFromMonthly(monthly, parseInt(el('pv-year')?.value)||2023);
+    S.pvSlots = slots;
+    const totalPV = monthly.reduce((a,b) => a+b, 0) / 1000;
+    zone.classList.add('loaded');
+    txt.textContent = `✓ "${file.name}" — ${fmt(totalPV,1)} MWh/an extraits`;
+    res.style.display = 'block';
+    res.style.background = 'var(--greenp)'; res.style.borderColor = 'var(--green)'; res.style.color = '#14532d';
+    res.innerHTML = `✓ Productions mensuelles extraites (${detectPDFFormat(fullText)}) :<br/>
+      <div style="display:grid;grid-template-columns:repeat(6,1fr);gap:3px;margin-top:6px;font-family:'DM Mono',monospace;font-size:.68rem">
+        ${['Jan','Fév','Mar','Avr','Mai','Juin','Juil','Aoû','Sep','Oct','Nov','Déc']
+          .map((m,i) => `<div style="text-align:center"><div style="color:var(--g500);font-size:.6rem">${m}</div><div style="font-weight:700">${fmt(monthly[i],0)}</div></div>`).join('')}
+      </div>
+      <div style="margin-top:5px;font-size:.7rem">Total : <strong>${fmt(totalPV,1)} MWh/an</strong> · ${fmt(slots.length)} quarts d'heure générés</div>`;
+    el('pv-annual-prod-badge').textContent = `→ ${fmt(totalPV,1)} MWh/an (PDF)`;
+    updateBadge();
+    zone.classList.remove('drag');
+  } catch(e) {
+    txt.textContent = '❌ Erreur lecture PDF';
+    res.style.display = 'block';
+    res.innerHTML = '⚠️ Erreur : ' + e.message;
+    zone.classList.remove('drag');
+    console.error(e);
+  }
+}
+
+function detectPDFFormat(text) {
+  if (text.includes('HelioScope') || text.includes('Aurora Solar')) return 'Helioscope / Aurora Solar';
+  if (text.includes('archelios') || text.includes('Archelios')) return 'Archelios Pro';
+  return 'Format inconnu';
+}
+
+function extractMonthlyFromPDF(text, filename) {
+  const isArcHelios = text.toLowerCase().includes('archelios') || filename.toLowerCase().includes('archelios');
+  const isHelio = text.toLowerCase().includes('helioscope') || text.toLowerCase().includes('aurora solar');
+
+  // ── ARCHELIOS: look for "jan fev mar ... dec" row followed by kWh values
+  if (isArcHelios) {
+    // Pattern: kWh  1 455  2 821  7 050  11 604  ...
+    // The table has months jan-dec with kWh values
+    const kwhMatch = text.match(/kWh\s+([\d\s,\.]+?)(?:Ans|Production|Autocons|$)/s);
+    if (kwhMatch) {
+      const nums = kwhMatch[1].match(/[\d]+(?:[,\.]\d+)?/g);
+      if (nums && nums.length >= 12) {
+        const monthly = nums.slice(0,12).map(n => parseFloat(n.replace(',','.')));
+        if (monthly.every(v => v >= 0 && v < 200000)) return monthly;
+      }
+    }
+    // Alternative: look for "jan fev mar avr mai juin juil aout sep oct nov dec" followed by numbers
+    const patternMonths = /jan\s+fev\s+mar\s+avr\s+mai\s+juin\s+juil\s+ao[uû]t\s+sep\s+oct\s+nov\s+dec[\s\S]{0,200}?(\d[\d\s,\.]+)/i;
+    const m2 = text.match(patternMonths);
+    if (m2) {
+      const nums = m2[1].match(/\d[\d\.,]*/g);
+      if (nums && nums.length >= 12) {
+        const monthly = nums.slice(0,12).map(n => parseFloat(n.replace(',','.')));
+        if (monthly.every(v => v >= 0 && v < 200000)) return monthly;
+      }
+    }
+  }
+
+  // ── HELIOSCOPE / AURORA: look for monthly table
+  if (isHelio) {
+    // Helioscope shows "Jan Feb Mar Apr May Jun Jul Aug Sep Oct Nov Dec" with values
+    const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    // Try to find "Annual Production" section with month values
+    const annProd = text.match(/Annual\s+Production[\s\S]{0,2000}/i);
+    const searchIn = annProd ? annProd[0] : text;
+    // Look for numbers after each month abbreviation  
+    const vals = [];
+    let lastIdx = 0;
+    for (const m of months) {
+      const re = new RegExp(m + '\\s+([\\d,\\.]+)', 'i');
+      const match = searchIn.match(re);
+      if (match) vals.push(parseFloat(match[1].replace(',','')));
+    }
+    if (vals.length >= 12) return vals.slice(0,12);
+    
+    // Alternative: just find 12 consecutive reasonable numbers (kWh range 100-100000)
+    const allNums = [...searchIn.matchAll(/(\d{3,6}(?:\.\d)?)\s/g)].map(m => parseFloat(m[1]));
+    const candidates = [];
+    for (let i=0; i<allNums.length-11; i++) {
+      const slice = allNums.slice(i,i+12);
+      const sum = slice.reduce((a,b)=>a+b,0);
+      // Reasonable annual PV: sum 5-500 MWh, first half < second half (summer peak)
+      if (sum > 5000 && sum < 500000 && slice[0] < slice[6] && slice[11] < slice[6]) {
+        return slice;
+      }
+    }
+  }
+
+  // ── Generic fallback: look for 12 consecutive kWh values in seasonal pattern
+  const allNums = [...text.matchAll(/(\d{2,6}(?:[,\.]\d{1,3})?)\s/g)].map(m => parseFloat(m[1].replace(',','.')));
+  for (let i=0; i<allNums.length-11; i++) {
+    const s = allNums.slice(i,i+12);
+    const sum = s.reduce((a,b)=>a+b,0);
+    if (sum>3000 && sum<500000 && s[0]<s[6] && s[11]<s[6] && s.every(v=>v>0&&v<80000)) return s;
+  }
+  return null;
+}
+
+function generateSlotsFromMonthly(monthlyKwh, year) {
+  // Distribute monthly totals into 15-min slots using a realistic daily PV profile
+  const daysInMonth = [31, isLeap(year)?29:28, 31,30,31,30,31,31,30,31,30,31];
+  const slots = [];
+  for (let m=0; m<12; m++) {
+    const targetKwh = monthlyKwh[m]; // kWh for the month
+    const totalSlots = daysInMonth[m] * 96;
+    // Build a weight array: for each slot in the month, what fraction of production?
+    const weights = [];
+    let wSum = 0;
+    for (let d=0; d<daysInMonth[m]; d++) {
+      const doy = daysInMonth.slice(0,m).reduce((a,b)=>a+b,0) + d + 1;
+      const dec = 23.45*Math.sin(2*Math.PI*(doy-81)/365)*Math.PI/180;
+      const lat = 50.85 * Math.PI/180; // Belgium average
+      for (let sl=0; sl<96; sl++) {
+        const tLocal = sl * 0.25;
+        const ha = (tLocal - 12) * 15 * Math.PI / 180;
+        const sinAlt = Math.sin(lat)*Math.sin(dec) + Math.cos(lat)*Math.cos(dec)*Math.cos(ha);
+        const w = Math.max(0, sinAlt);
+        weights.push(w);
+        wSum += w;
+      }
+    }
+    // Scale weights so sum = targetKwh (in kW at 15-min → kWh = kW × 0.25)
+    // kW = kWh / (0.25h) → for each slot, pv_kw = (weight/wSum * targetKwh) / 0.25
+    const scale = wSum > 0 ? targetKwh / (wSum * 0.25) : 0;
+    let slotIdx = 0;
+    for (let d=0; d<daysInMonth[m]; d++) {
+      for (let sl=0; sl<96; sl++) {
+        const ts = new Date(year, m, d+1, Math.floor(sl/4), (sl%4)*15);
+        const pvKw = weights[slotIdx] * scale;
+        slots.push({ ts, pv: Math.max(0, pvKw) });
+        slotIdx++;
+      }
+    }
+  }
+  return slots;
 }
 
 // Init
