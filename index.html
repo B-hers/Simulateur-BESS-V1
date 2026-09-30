@@ -337,7 +337,64 @@ footer strong{color:var(--wg-green-d)}
         <div class="input-mode-tabs">
           <button class="imt active" onclick="setInputMode('conso','paste',this)">📋 Coller</button>
           <button class="imt" onclick="setInputMode('conso','file',this)">📂 Fichier Excel</button>
+          <button class="imt" onclick="setInputMode('conso','profile',this)">🏢 Profil type + conso annuelle</button>
+          <button class="imt" onclick="setInputMode('conso','invoice',this)">🧾 Factures d'énergie (PDF)</button>
         </div>
+
+        <!-- PROFILE MODE -->
+        <div id="conso-profile-mode" style="display:none">
+          <div class="ib" style="margin-bottom:10px">
+            À utiliser quand les quarts horaires ne sont pas disponibles. Le simulateur génère une année complète au pas 15 min à partir d'un <strong>profil type</strong> (forme journalière, semaine/week-end, saisonnalité) calé sur la <strong>consommation annuelle</strong>. La pointe peut être calée si elle est connue (fortement recommandé pour le peak shaving).
+          </div>
+          <div class="g4">
+            <div class="f"><label>Profil type</label>
+              <select id="prof-type">
+                <option value="bureau">Bureau / tertiaire</option>
+                <option value="supermarche">Supermarché / commerce</option>
+                <option value="industrie">Industrie (2 postes, lun-ven)</option>
+                <option value="neutre">Neutre (plat)</option>
+              </select></div>
+            <div class="f"><label>Consommation annuelle</label><div class="ir"><input type="number" id="prof-annual" value="500" min="1" step="1"/><div class="iu">MWh/an</div></div></div>
+            <div class="f"><label>Pointe 15 min <span class="h">(optionnel)</span></label><div class="ir"><input type="number" id="prof-peak" placeholder="auto" min="0" step="1"/><div class="iu">kW</div></div></div>
+            <div class="f"><label>Année du profil</label><select id="prof-year"><option value="2023">2023</option><option value="2024">2024</option><option value="2025" selected>2025</option></select></div>
+          </div>
+          <div id="prof-desc" class="ib" style="margin-top:4px;font-size:.68rem"></div>
+          <div style="margin-top:9px"><button class="btn btn-primary" onclick="generateConsoFromProfile()">⚙️ Générer le profil 15 min</button></div>
+        </div>
+
+        <!-- INVOICE MODE -->
+        <div id="conso-invoice-mode" style="display:none">
+          <div class="ib" style="margin-bottom:10px">
+            Importez une ou plusieurs <strong>factures mensuelles</strong> (PDF, format ENGIE/Electrabel type « Données de mesure / Données de facturation »). Extraction par facture : consommations HP/HC, puissances max HP/HC, prix unitaires, <strong>formule d'indexation</strong> (ex. 8,25 + 1,220 × PowerClick), valeur de l'index, coûts réseau et taxes.<br/>
+            Le profil 15 min est ensuite reconstruit mois par mois : forme du profil type choisi, <strong>énergie HP et HC calées</strong> sur la facture, <strong>pointe calée</strong> sur la puissance mesurée. Les mois sans facture sont complétés avec la consommation annuelle glissante indiquée sur la facture la plus récente. Les factures rectificatives (même période) remplacent la version antérieure.
+          </div>
+          <div class="upload-zone" id="invoice-upload-zone" ondragover="handleDrag(event,this)" ondragleave="handleDragLeave(this)" ondrop="handleInvoiceDrop(event)">
+            <input type="file" accept=".pdf" multiple onchange="handleInvoiceFiles(this.files)"/>
+            <div class="uz-icon">🧾</div>
+            <div class="uz-text" id="invoice-upload-text">Glisser-déposer une ou plusieurs factures PDF</div>
+            <div class="uz-sub">Plusieurs fichiers acceptés · Traitement 100% local</div>
+          </div>
+          <div id="invoice-table" class="data-preview" style="margin-top:10px"></div>
+          <div id="invoice-actions" class="hidden" style="margin-top:10px">
+            <div class="g3">
+              <div class="f"><label>Profil type (forme horaire)</label>
+                <select id="inv-prof-type">
+                  <option value="bureau">Bureau / tertiaire</option>
+                  <option value="supermarche">Supermarché / commerce</option>
+                  <option value="industrie" selected>Industrie (2 postes, lun-ven)</option>
+                  <option value="neutre">Neutre (plat)</option>
+                </select></div>
+              <div class="f"><label>Consommation annuelle retenue</label><div class="ir"><input type="number" id="inv-annual" min="0" step="0.1"/><div class="iu">MWh/an</div></div></div>
+              <div class="f"><label>Année du profil</label><select id="inv-year"><option value="2024">2024</option><option value="2025" selected>2025</option><option value="2026">2026</option></select></div>
+            </div>
+            <div style="display:flex;gap:7px;flex-wrap:wrap;margin-top:4px">
+              <button class="btn btn-primary" onclick="generateConsoFromInvoices()">⚙️ Générer le profil 15 min</button>
+              <button class="btn btn-secondary" onclick="applyInvoiceToContract()">⚡ Appliquer la formule au contrat énergie</button>
+              <button class="btn btn-secondary" onclick="S.invoices=[];renderInvoiceTable()">🗑 Vider</button>
+            </div>
+          </div>
+        </div>
+        <div class="chips" id="stats-conso-gen" style="margin-top:8px"></div>
 
         <!-- PASTE MODE -->
         <div id="conso-paste-mode">
@@ -397,7 +454,7 @@ footer strong{color:var(--wg-green-d)}
           <button class="tpill active" data-type="tou">📋 Tarif HP/HC (contrat fixe)</button>
           <button class="tpill" data-type="flat">🔷 Tarif fixe unique</button>
           <button class="tpill" data-type="spot">📈 Prix spot (paste 15min ou horaire)</button>
-          <button class="tpill" data-type="index">🔗 Indexé (spot + marge fixe)</button>
+          <button class="tpill" data-type="index">🔗 Indexé (formule fournisseur)</button>
         </div>
 
         <!-- HP/HC -->
@@ -444,18 +501,49 @@ footer strong{color:var(--wg-green-d)}
               <div class="uz-sub">ou cliquer pour parcourir · .xlsx .xls .csv</div>
             </div>
           </div>
+          <div class="g2" style="margin-top:10px">
+            <div class="f"><label>Surcoûts offtake <span class="h">(réseau + taxes + marge, ajoutés au spot)</span></label><div class="ir"><input type="number" id="p-spot-surcout" value="100" step="1"/><div class="iu">€/MWh</div></div></div>
+            <div class="f"><label>Injection = spot +</label><div class="ir"><input type="number" id="p-spot-inj" value="-10" step="1"/><div class="iu">€/MWh</div></div></div>
+          </div>
           <div class="prog-wrap" id="prog-spot"><div class="prog-bar"><div class="prog-fill" id="fill-spot" style="width:0%"></div></div><div class="prog-lbl" id="lbl-spot">—</div></div>
           <div class="chips" id="stats-spot" style="margin-top:8px"></div>
         </div>
 
         <!-- Indexed -->
         <div id="prix-index" class="prix-panel hidden">
-          <div class="ib" style="margin-bottom:8px">Spot + marge fixe : utilisez les prix spot collés ci-dessus avec une marge appliquée.</div>
-          <div class="g2">
-            <div class="f"><label>Marge fixe sur spot (offtake)</label><div class="ir"><input type="number" id="p-idx-markup" value="25" min="-100" max="200" step="1"/><div class="iu">€/MWh</div></div></div>
-            <div class="f"><label>Marge fixe injection</label><div class="ir"><input type="number" id="p-idx-inj-markup" value="-20" min="-200" max="100" step="1"/><div class="iu">€/MWh</div></div></div>
+          <div class="ib" style="margin-bottom:8px">
+            Formule du fournisseur : <strong>Prix énergie = constante + coefficient × Index</strong>, distincte en HP et HC (ex. ENGIE : HP = 8,25 + 1,220 × PowerClick ; HC = 8,25 + 0,830 × PowerClick).<br/>
+            Prix total offtake utilisé pour valoriser chaque kWh évité = prix énergie + <strong>coûts réseau proportionnels</strong> + <strong>autres surcoûts</strong> (pertes Elia, GO, contribution renouvelable, accises, consultant...). Ces valeurs se remplissent automatiquement depuis les factures importées.
           </div>
-          <div class="ib warn" style="margin-top:8px">Nécessite les prix spot ci-dessus (onglet Spot).</div>
+          <div class="sec">Formule énergie</div>
+          <div class="g4">
+            <div class="f"><label>HP : constante</label><div class="ir"><input type="number" id="p-idx-a-hp" value="8.25" step="0.01"/><div class="iu">€/MWh</div></div></div>
+            <div class="f"><label>HP : coefficient</label><div class="ir"><input type="number" id="p-idx-b-hp" value="1.22" step="0.001"/><div class="iu">× Index</div></div></div>
+            <div class="f"><label>HC : constante</label><div class="ir"><input type="number" id="p-idx-a-hc" value="8.25" step="0.01"/><div class="iu">€/MWh</div></div></div>
+            <div class="f"><label>HC : coefficient</label><div class="ir"><input type="number" id="p-idx-b-hc" value="0.83" step="0.001"/><div class="iu">× Index</div></div></div>
+          </div>
+          <div class="sec">Valeur de l'index</div>
+          <div class="g2">
+            <div class="f"><label>Source de l'index</label>
+              <select id="p-idx-source">
+                <option value="fixed" selected>Valeur fixe (ex. PowerClick moyen)</option>
+                <option value="monthly">Moyenne mensuelle du spot chargé (index mensuel type PowerClick)</option>
+                <option value="spot15">Spot quart-horaire (contrat dynamique)</option>
+              </select></div>
+            <div class="f"><label>Valeur fixe de l'index</label><div class="ir"><input type="number" id="p-idx-value" value="85.5" step="0.01"/><div class="iu">€/MWh</div></div></div>
+          </div>
+          <div class="sec">Surcoûts ajoutés au prix énergie (offtake)</div>
+          <div class="g2">
+            <div class="f"><label>Coûts réseau proportionnels <span class="h">(distribution + transport)</span></label><div class="ir"><input type="number" id="p-idx-reseau" value="47" step="0.1"/><div class="iu">€/MWh</div></div></div>
+            <div class="f"><label>Autres surcoûts <span class="h">(taxes, GO, pertes, consultant)</span></label><div class="ir"><input type="number" id="p-idx-autres" value="49" step="0.1"/><div class="iu">€/MWh</div></div></div>
+          </div>
+          <div class="sec">Injection</div>
+          <div class="g2">
+            <div class="f"><label>Injection : coefficient</label><div class="ir"><input type="number" id="p-idx-inj-coef" value="1" step="0.01"/><div class="iu">× Index</div></div></div>
+            <div class="f"><label>Injection : constante</label><div class="ir"><input type="number" id="p-idx-inj-markup" value="-20" min="-200" max="100" step="1"/><div class="iu">€/MWh</div></div></div>
+          </div>
+          <div class="chips" id="idx-preview" style="margin-top:8px"></div>
+          <div class="ib warn" style="margin-top:8px;font-size:.68rem">⚠️ Les coûts réseau facturés contiennent souvent une part capacitaire (pointe). Si vous renseignez aussi les tarifs de pointe ci-dessous, ne gardez ici que la part proportionnelle au kWh pour éviter un double comptage.</div>
         </div>
       </div>
     </div>
@@ -481,7 +569,7 @@ footer strong{color:var(--wg-green-d)}
       <div class="ch"><div class="ico">☀️</div><h2>Source des données de production PV</h2></div>
       <div class="cb">
         <div class="type-pills" id="pv-mode-pills">
-          <button class="tpill active" data-pvmode="simulate">🌍 Simuler par ville belge (kWc + PR)</button>
+          <button class="tpill active" data-pvmode="simulate">🌍 Simuler (ratio ou localisation)</button>
           <button class="tpill" data-pvmode="paste">📋 Fournir mes données mesurées</button>
           <button class="tpill" data-pvmode="none">🚫 Pas de PV sur ce site</button>
         </div>
@@ -493,17 +581,28 @@ footer strong{color:var(--wg-green-d)}
       <div class="card">
         <div class="ch"><div class="ico">🏙️</div><h2>Ville & paramètres d'installation PV</h2><div class="sub" id="pv-annual-prod-badge"></div></div>
         <div class="cb">
-          <div class="sec">Localisation</div>
-          <div class="city-grid" id="city-grid"></div>
-
-          <div class="sec">Paramètres techniques</div>
-          <div class="g3">
-            <div class="f"><label>Puissance crête</label><div class="ir"><input type="number" id="pv-kwc" value="100" min="1" max="10000" step="1"/><div class="iu">kWc</div></div></div>
-            <div class="f"><label>Ratio de performance (PR)</label><div class="ir"><input type="number" id="pv-pr" value="0.82" min="0.5" max="1.0" step="0.01"/><div class="iu">—</div></div></div>
-            <div class="f"><label>Inclinaison des panneaux</label><div class="ir"><input type="number" id="pv-tilt" value="35" min="0" max="90" step="5"/><div class="iu">degrés</div></div></div>
+          <div class="sec">Méthode de simulation (une seule)</div>
+          <div class="type-pills" id="pv-method-pills">
+            <button class="tpill active" data-pvmethod="ratio">📐 Ratio de production (kWh/kWc)</button>
+            <button class="tpill" data-pvmethod="geo">🧭 Localisation + inclinaison + orientation</button>
           </div>
-          <div class="sec">Orientation (azimut)</div>
-          <div class="orient-grid" id="orient-grid"></div>
+          <div class="g2">
+            <div class="f"><label>Puissance crête</label><div class="ir"><input type="number" id="pv-kwc" value="100" min="1" max="10000" step="1"/><div class="iu">kWc</div></div></div>
+            <div id="pv-ratio-block" class="f"><label>Ratio de production annuel</label><div class="ir"><input type="number" id="pv-ratio" value="900" min="300" max="1400" step="10"/><div class="iu">kWh/kWc/an</div></div></div>
+          </div>
+          <div id="pv-ratio-note" class="ib" style="font-size:.68rem">Le ratio (issu d'une étude Archelios/PVGIS ou d'un site comparable) fixe l'énergie annuelle. La répartition horaire et mensuelle suit un profil type belge (Bruxelles, plein Sud, 35°). Ordre de grandeur Belgique : 800 à 950 kWh/kWc selon orientation.</div>
+
+          <div id="pv-geo-block" class="hidden">
+            <div class="sec">Localisation</div>
+            <div class="city-grid" id="city-grid"></div>
+            <div class="sec">Paramètres techniques</div>
+            <div class="g2">
+              <div class="f"><label>Ratio de performance (PR)</label><div class="ir"><input type="number" id="pv-pr" value="0.82" min="0.5" max="1.0" step="0.01"/><div class="iu">—</div></div></div>
+              <div class="f"><label>Inclinaison des panneaux</label><div class="ir"><input type="number" id="pv-tilt" value="35" min="0" max="90" step="5"/><div class="iu">degrés</div></div></div>
+            </div>
+            <div class="sec">Orientation (azimut) <span style="text-transform:none;font-weight:400;color:var(--g400)">· % indicatif vs plein Sud à 35°</span></div>
+            <div class="orient-grid" id="orient-grid"></div>
+          </div>
           <div class="f" style="margin-top:10px"><label>Année de référence pour la simulation</label>
             <select id="pv-year"><option value="2023" selected>2023</option><option value="2022">2022</option><option value="2024">2024</option></select>
           </div>
@@ -659,6 +758,19 @@ footer strong{color:var(--wg-green-d)}
 
   <!-- Conservateur -->
   <div class="scen-panel active" id="scen-cons">
+    <div class="card">
+      <div class="ch"><div class="ico">📅</div><h2>Année de référence des revenus réseau — Conservateur</h2></div>
+      <div class="cb">
+        <div class="g3">
+          <div class="f"><label>Année de référence FCR / aFRR</label>
+            <select id="cons-ref-year" class="ref-year-sel" data-scen="cons" data-default="2025">
+              <option value="2021">2021</option><option value="2022">2022</option><option value="2023">2023</option><option value="2024">2024</option><option value="2025">2025</option>
+              <option value="avg">Moyenne 2021-2025</option><option value="avg3">Moyenne 3 dernières années</option><option value="custom">Personnalisé (saisie manuelle)</option>
+            </select></div>
+          <div class="f" style="grid-column:span 2"><label>Prix appliqués</label><div class="ib" id="cons-ref-info" style="font-size:.7rem">—</div></div>
+        </div>
+      </div>
+    </div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
       <div>
         <div class="card">
@@ -723,6 +835,19 @@ footer strong{color:var(--wg-green-d)}
 
   <!-- Base -->
   <div class="scen-panel" id="scen-base">
+    <div class="card">
+      <div class="ch"><div class="ico">📅</div><h2>Année de référence des revenus réseau — Base</h2></div>
+      <div class="cb">
+        <div class="g3">
+          <div class="f"><label>Année de référence FCR / aFRR</label>
+            <select id="base-ref-year" class="ref-year-sel" data-scen="base" data-default="avg">
+              <option value="2021">2021</option><option value="2022">2022</option><option value="2023">2023</option><option value="2024">2024</option><option value="2025">2025</option>
+              <option value="avg">Moyenne 2021-2025</option><option value="avg3">Moyenne 3 dernières années</option><option value="custom">Personnalisé (saisie manuelle)</option>
+            </select></div>
+          <div class="f" style="grid-column:span 2"><label>Prix appliqués</label><div class="ib" id="base-ref-info" style="font-size:.7rem">—</div></div>
+        </div>
+      </div>
+    </div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
       <div>
         <div class="card">
@@ -775,6 +900,19 @@ footer strong{color:var(--wg-green-d)}
 
   <!-- Optimiste -->
   <div class="scen-panel" id="scen-opti">
+    <div class="card">
+      <div class="ch"><div class="ico">📅</div><h2>Année de référence des revenus réseau — Optimiste</h2></div>
+      <div class="cb">
+        <div class="g3">
+          <div class="f"><label>Année de référence FCR / aFRR</label>
+            <select id="opti-ref-year" class="ref-year-sel" data-scen="opti" data-default="2024">
+              <option value="2021">2021</option><option value="2022">2022</option><option value="2023">2023</option><option value="2024">2024</option><option value="2025">2025</option>
+              <option value="avg">Moyenne 2021-2025</option><option value="avg3">Moyenne 3 dernières années</option><option value="custom">Personnalisé (saisie manuelle)</option>
+            </select></div>
+          <div class="f" style="grid-column:span 2"><label>Prix appliqués</label><div class="ib" id="opti-ref-info" style="font-size:.7rem">—</div></div>
+        </div>
+      </div>
+    </div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
       <div>
         <div class="card">
@@ -960,7 +1098,7 @@ footer strong{color:var(--wg-green-d)}
 </div>
 
 </main>
-<footer>We Green Invest · Simulateur BESS v2.0 · PV simulé sur profil météo typique belge · Dispatch sur données réelles · Confidentiel</footer>
+<footer>We Green Invest · Simulateur BESS v2.1 · PV simulé sur profil météo typique belge · Dispatch sur données réelles · Confidentiel</footer>
 
 <script>
 // ═══════════════════════════════ STATE ═══════════════════════════════
@@ -974,6 +1112,8 @@ const S = {
   simResults: null,
   selectedCity: 'Bruxelles',
   selectedOrient: 0,
+  pvMethod: 'ratio', // 'ratio' | 'geo'
+  invoices: [],      // factures importées (voir parseInvoiceText)
 };
 
 const fmt = (v,d=0) => (v==null||isNaN(v))?'—':v.toLocaleString('fr-BE',{minimumFractionDigits:d,maximumFractionDigits:d});
@@ -999,15 +1139,18 @@ const CITIES = {
 };
 
 // Orientation factors (vs South=0°, positive=West)
+// factor = rendement indicatif vs plein Sud à 35° (calculé avec le modèle ci-dessous, Bruxelles). Affichage uniquement.
+// flat:true force l'inclinaison à 0°.
 const ORIENTATIONS = [
-  {label:'Sud (S)',       deg:0,   factor:1.000},
-  {label:'Sud-Est (SE)',  deg:-45, factor:0.934},
-  {label:'Sud-Ouest (SO)',deg:45,  factor:0.934},
-  {label:'Est (E)',       deg:-90, factor:0.748},
-  {label:'Ouest (O)',     deg:90,  factor:0.748},
-  {label:'Nord-Est (NE)', deg:-135,factor:0.531},
-  {label:'Nord-Ouest (NO)',deg:135,factor:0.531},
-  {label:'Plat (0° tilt)',deg:0,   factor:0.872},
+  {label:'Sud (S)',        deg:0,   factor:1.00},
+  {label:'Sud-Est (SE)',   deg:-45, factor:0.96},
+  {label:'Sud-Ouest (SO)', deg:45,  factor:0.96},
+  {label:'Est (E)',        deg:-90, factor:0.85},
+  {label:'Ouest (O)',      deg:90,  factor:0.85},
+  {label:'Nord-Est (NE)',  deg:-135,factor:0.72},
+  {label:'Nord-Ouest (NO)',deg:135, factor:0.72},
+  {label:'Nord (N)',       deg:180, factor:0.66},
+  {label:'Plat (0°)',      deg:0,   factor:0.92, flat:true},
 ];
 
 // ═══════════════════════ NAVIGATION ═══════════════════════
@@ -1103,7 +1246,9 @@ function buildCityGrid(){
   Object.entries(CITIES).forEach(([name,city])=>{
     const b=document.createElement('button');
     b.className='city-btn'+(name===S.selectedCity?' active':'');
-    b.innerHTML=`${name}<span class="city-ghi">${city.annual} kWh/m²/an</span>`;
+    const dimC=[31,28,31,30,31,30,31,31,30,31,30,31];
+    const ann=Math.round(city.ghi.reduce((a,g,m)=>a+g*dimC[m],0)); // somme des GHI mensuels (cohérent avec le calcul)
+    b.innerHTML=`${name}<span class="city-ghi">${ann} kWh/m²/an</span>`;
     b.onclick=()=>{
       document.querySelectorAll('.city-btn').forEach(x=>x.classList.remove('active'));
       b.classList.add('active');
@@ -1133,11 +1278,15 @@ buildOrientGrid();
 // ═══════════════════════ SOLAR PV SIMULATION ═══════════════════════
 function generatePV(){
   const kWc=parseFloat(el('pv-kwc').value)||100;
-  const pr=parseFloat(el('pv-pr').value)||0.82;
-  const tilt=parseFloat(el('pv-tilt').value)||35;
   const year=parseInt(el('pv-year').value)||2023;
-  const city=CITIES[S.selectedCity];
-  const orient=ORIENTATIONS[S.selectedOrient];
+  const byRatio=S.pvMethod==='ratio';
+  const ratio=parseFloat(el('pv-ratio').value)||900;
+  // Méthode "ratio" : profil de forme Bruxelles/Sud/35°, énergie annuelle imposée = kWc x ratio
+  // Méthode "geo"   : ville + inclinaison + orientation + PR, énergie issue du modèle
+  const pr=byRatio?1:(parseFloat(el('pv-pr').value)||0.82);
+  const orient=byRatio?ORIENTATIONS[0]:ORIENTATIONS[S.selectedOrient];
+  const tilt=byRatio?35:(orient.flat?0:(parseFloat(el('pv-tilt').value)||0));
+  const city=byRatio?CITIES['Bruxelles']:CITIES[S.selectedCity];
 
   const prog=el('prog-pv');
   prog.classList.add('visible');
@@ -1146,6 +1295,7 @@ function generatePV(){
 
   setTimeout(()=>{
     const slots=generateSolarProfile(year,kWc,pr,tilt,orient.deg,city);
+    if(byRatio){const tot=slots.reduce((a,b)=>a+b.pv,0)*0.25;const k=tot>0?kWc*ratio/tot:0;slots.forEach(s=>s.pv*=k);}
     el('fill-pv').style.width='80%';
     el('lbl-pv').textContent='Génération du profil...';
     setTimeout(()=>{
@@ -1156,7 +1306,7 @@ function generatePV(){
         <div class="chip orange"><div class="chip-l">Production totale</div><div class="chip-v">${fmt(totalPV,1)} MWh/an</div></div>
         <div class="chip orange"><div class="chip-l">Puissance max.</div><div class="chip-v">${fmt(peakPV,1)} kW</div></div>
         <div class="chip orange"><div class="chip-l">Production spécifique</div><div class="chip-v">${fmt(totalPV*1000/kWc,0)} kWh/kWc</div></div>
-        <div class="chip orange"><div class="chip-l">Ville</div><div class="chip-v">${S.selectedCity}</div></div>
+        <div class="chip orange"><div class="chip-l">Méthode</div><div class="chip-v" style="font-size:.72rem">${byRatio?'Ratio '+fmt(ratio)+' kWh/kWc':S.selectedCity+' · '+orient.label+' · '+tilt+'°'}</div></div>
       `;
       el('pv-annual-prod-badge').textContent=`→ ${fmt(totalPV,1)} MWh/an simulés`;
       el('fill-pv').style.width='100%';
@@ -1167,53 +1317,50 @@ function generatePV(){
   },50);
 }
 
+// Modèle solaire (v3) :
+// 1) profil ciel clair horizontal (géométrie solaire + masse d'air) ;
+// 2) calage de chaque jour sur le GHI mensuel HORIZONTAL de la ville x facteur nuage (moyenne mensuelle = 1) ;
+// 3) transposition sur le plan des panneaux : direct (Rb) + diffus isotrope + albédo 0,2,
+//    avec une fraction diffuse mensuelle typique belge (KD).
+// Convention : orientDeg = 0 Sud, -90 Est, +90 Ouest, 180 Nord.
+const KD_BE=[0.72,0.66,0.60,0.55,0.52,0.52,0.52,0.53,0.56,0.62,0.70,0.74];
 function generateSolarProfile(year,kWc,pr,tiltDeg,orientDeg,city){
-  const tiltRad=tiltDeg*Math.PI/180;
-  const orientRad=orientDeg*Math.PI/180;
-  const latRad=city.lat*Math.PI/180;
-  const daysInMonth=[31,isLeap(year)?29:28,31,30,31,30,31,31,30,31,30,31];
-  const slots=[];
-  let doy=0;
-
+  const beta=tiltDeg*Math.PI/180, azP=Math.PI-orientDeg*Math.PI/180, lat=city.lat*Math.PI/180;
+  const dim=[31,isLeap(year)?29:28,31,30,31,30,31,31,30,31,30,31];
+  const slots=[];let doy=0;
   for(let m=0;m<12;m++){
-    const targetDailyWh=city.ghi[m]*1000; // Wh/m²/day on tilted surface (approx)
-    for(let d=0;d<daysInMonth[m];d++){
+    const target=city.ghi[m]*1000, kd=KD_BE[m];
+    // facteurs nuage déterministes, normalisés à une moyenne de 1 sur le mois
+    const clouds=[];for(let d=0;d<dim[m];d++){const h=(((doy+d+1)*2654435761+year*40503)>>>0)%1000/1000;clouds.push(0.6+0.8*h);}
+    const cm=clouds.reduce((a,b)=>a+b,0)/clouds.length;
+    for(let d=0;d<dim[m];d++){
       doy++;
       const dec=23.45*Math.sin(2*Math.PI*(doy-81)/365)*Math.PI/180;
-      // Clear-sky profile
-      const cs=[];let csSum=0;
+      const B=2*Math.PI*(doy-81)/364, EoT=(9.87*Math.sin(2*B)-7.53*Math.cos(B)-1.5*Math.sin(B))/60;
+      const gh=[],rb=[];let hSum=0;
       for(let sl=0;sl<96;sl++){
-        const tLocal=sl*0.25;
-        const B=2*Math.PI*(doy-81)/364;
-        const EoT=(9.87*Math.sin(2*B)-7.53*Math.cos(B)-1.5*Math.sin(B))/60;
-        const TST=tLocal+(city.lng-15)/15+EoT;
+        const TST=sl*0.25+0.125+(city.lng-15)/15+EoT;
         const ha=(TST-12)*15*Math.PI/180;
-        const sinAlt=Math.sin(latRad)*Math.sin(dec)+Math.cos(latRad)*Math.cos(dec)*Math.cos(ha);
-        let ghi=0;
+        const sinAlt=Math.sin(lat)*Math.sin(dec)+Math.cos(lat)*Math.cos(dec)*Math.cos(ha);
+        let g=0,r=0;
         if(sinAlt>0.01){
           const alt=Math.asin(sinAlt);
           const AM=1/(sinAlt+0.50572*Math.pow(alt*180/Math.PI+6.07995,-1.6364));
           const Et=1353*(1+0.033*Math.cos(2*Math.PI*doy/365));
-          const Ib=Et*Math.pow(0.7,Math.pow(AM,0.678));
-          const Id=0.1*Et*sinAlt;
-          const ghiH=(Ib+Id)*sinAlt;
-          // Incidence on tilted surface
-          const cosAz=ha<0?1:-1;
-          const sunAz=ha<0?-Math.acos(Math.max(-1,Math.min(1,(Math.sin(dec)*Math.cos(latRad)-Math.cos(dec)*Math.sin(latRad)*Math.cos(ha))/Math.cos(alt)))):Math.acos(Math.max(-1,Math.min(1,(Math.sin(dec)*Math.cos(latRad)-Math.cos(dec)*Math.sin(latRad)*Math.cos(ha))/Math.cos(alt))));
-          const cosTheta=sinAlt*Math.cos(tiltRad)+Math.cos(alt)*Math.sin(tiltRad)*Math.cos(sunAz-orientRad);
-          ghi=Math.max(0,ghiH*cosTheta/sinAlt);
+          g=(Et*Math.pow(0.7,Math.pow(AM,0.678))+0.1*Et*sinAlt)*sinAlt; // GHI ciel clair horizontal
+          const cz=Math.max(-1,Math.min(1,(Math.sin(dec)*Math.cos(lat)-Math.cos(dec)*Math.sin(lat)*Math.cos(ha))/Math.cos(alt)));
+          const az=ha<0?-Math.acos(cz):Math.acos(cz); // azimut solaire depuis le Nord (Est négatif)
+          const cosT=sinAlt*Math.cos(beta)+Math.cos(alt)*Math.sin(beta)*Math.cos(az-azP);
+          r=Math.min(5,Math.max(0,cosT)/sinAlt);
         }
-        cs.push(ghi);csSum+=ghi*0.25;
+        gh.push(g);rb.push(r);hSum+=g*0.25;
       }
-      // Scale to monthly target + daily cloud variability (deterministic)
-      const scale=csSum>0?targetDailyWh/csSum:0;
-      const seed=(doy*137+year*13)%100/100;
-      const cloudF=0.65+0.5*seed; // 0.65–1.15, realistic Belgian variability
+      const scale=hSum>0?target/hSum*clouds[d]/cm:0;
       for(let sl=0;sl<96;sl++){
-        const irr=Math.max(0,cs[sl]*scale*cloudF);
-        const pvKw=irr/1000*kWc*pr;
+        const G=gh[sl]*scale;
+        const poa=G*(1-kd)*rb[sl]+G*kd*(1+Math.cos(beta))/2+G*0.2*(1-Math.cos(beta))/2;
         const ts=new Date(year,m,d+1,Math.floor(sl/4),(sl%4)*15);
-        slots.push({ts,pv:Math.max(0,pvKw)});
+        slots.push({ts,pv:Math.max(0,poa/1000*kWc*pr)});
       }
     }
   }
@@ -1451,7 +1598,8 @@ function parsePVData(){
 }
 
 function updateBadge(){
-  const n=[S.conso?1:0,(S.pvSlots||S.pvMode==='none')?1:0,(S.priceType!=='spot'||S.spotPrices)?1:0].reduce((a,b)=>a+b,0);
+  const needSpot=S.priceType==='spot'||(S.priceType==='index'&&el('p-idx-source')&&el('p-idx-source').value!=='fixed');
+  const n=[S.conso?1:0,(S.pvSlots||S.pvMode==='none')?1:0,(!needSpot||S.spotPrices)?1:0].reduce((a,b)=>a+b,0);
   el('badge-data').textContent=n+'/3';
   updateRecap();
 }
@@ -1497,7 +1645,7 @@ function updateRecap(){
     el('sr-grid').textContent=(el('site-grid-limit').value||'—')+' kW';
     el('sr-conso').textContent=S.conso?`✓ ${fmt(S.conso.length)} pts`:'❌ Non chargée';
     el('sr-pv').textContent=S.pvSlots?(S.pvMode==='none'?'✓ Sans PV':`✓ ${fmt(S.pvSlots.reduce((a,b)=>a+b.pv,0)*0.25/1000,1)} MWh/an`):'❌ Non définie';
-    el('sr-prix').textContent={tou:'✓ Tarif HP/HC',flat:'✓ Tarif fixe',spot:S.spotPrices?`✓ Spot (${fmt(S.spotPrices.length)} pts)`:'❌ Spot non chargé',index:'✓ Indexé'}[S.priceType]||'—';
+    el('sr-prix').textContent={tou:'✓ Tarif HP/HC',flat:'✓ Tarif fixe',spot:S.spotPrices?`✓ Spot (${fmt(S.spotPrices.length)} pts)`:'❌ Spot non chargé',index:`✓ Indexé (HP ${el('p-idx-a-hp').value} + ${el('p-idx-b-hp').value}×idx)`}[S.priceType]||'—';
   }
 }
 
@@ -1514,13 +1662,42 @@ function isHP(h,dow){
   const s=parseInt(el('p-hp-start').value)||7,e=parseInt(el('p-hp-end').value)||22;
   return h>=s&&h<e&&dow>0&&dow<6;
 }
-function getTariff(h,dow,type){
-  if(type==='flat')return parseFloat(el('p-flat').value)||240;
-  if(type==='tou'||type==='index')return isHP(h,dow)?(parseFloat(el('p-offtake-hp').value)||290):(parseFloat(el('p-offtake-hc').value)||200);
-  return 200;
+// ═══════════════════════ PRIX PAR QUART D'HEURE ═══════════════════════
+// Retourne pour chaque slot : pOff (prix total offtake, €/MWh) et pInj (prix injection, €/MWh).
+// tou   : HP/HC fixes (tout compris)
+// flat  : prix unique
+// spot  : spot 15 min + surcoûts (réseau, taxes, marge)
+// index : constante + coefficient x Index (HP/HC) + coûts réseau + autres surcoûts
+//         Index = valeur fixe | moyenne mensuelle du spot chargé | spot quart-horaire
+function priceContext(){
+  const hasSpot=!!(S.spotPrices&&S.spotPrices.length);
+  const src=el('p-idx-source')?el('p-idx-source').value:'fixed';
+  const monthly=Array(12).fill(null);
+  if(hasSpot){const sum=Array(12).fill(0),n=Array(12).fill(0);
+    S.spotPrices.forEach(p=>{if(p.ts){const m=p.ts.getMonth();sum[m]+=p.price;n[m]++;}});
+    for(let m=0;m<12;m++)if(n[m])monthly[m]=sum[m]/n[m];}
+  const t=S.priceType;
+  const varying=hasSpot&&(t==='spot'||(t==='index'&&src==='spot15'));
+  return {t,hasSpot,src,monthly,varying,
+    hp:getV('p-offtake-hp'),hc:getV('p-offtake-hc'),ihp:getV('p-inject-hp'),ihc:getV('p-inject-hc'),
+    flat:getV('p-flat'),flatInj:getV('p-flat-inj'),
+    spSur:getV('p-spot-surcout'),spInj:getV('p-spot-inj'),
+    aHP:getV('p-idx-a-hp'),bHP:getV('p-idx-b-hp'),aHC:getV('p-idx-a-hc'),bHC:getV('p-idx-b-hc'),
+    idxFix:getV('p-idx-value'),res:getV('p-idx-reseau'),aut:getV('p-idx-autres'),
+    iCoef:getV('p-idx-inj-coef'),iConst:getV('p-idx-inj-markup')};
 }
-function getInjectTariff(h,dow){
-  return isHP(h,dow)?(parseFloat(el('p-inject-hp').value)||70):(parseFloat(el('p-inject-hc').value)||50);
+function spotAt(i){const L=S.spotPrices.length;return S.spotPrices[i<L?i:i%L].price;}
+function slotPrices(i,hp,month,c){
+  if(c.t==='flat')return {pOff:c.flat,pInj:c.flatInj};
+  if(c.t==='spot'&&c.hasSpot){const sp=spotAt(i);return {pOff:sp+c.spSur,pInj:sp+c.spInj};}
+  if(c.t==='index'){
+    let idx=c.idxFix;
+    if(c.src==='monthly'&&c.monthly[month]!=null)idx=c.monthly[month];
+    else if(c.src==='spot15'&&c.hasSpot)idx=spotAt(i);
+    const en=hp?c.aHP+c.bHP*idx:c.aHC+c.bHC*idx;
+    return {pOff:en+c.res+c.aut,pInj:c.iCoef*idx+c.iConst};
+  }
+  return {pOff:hp?c.hp:c.hc,pInj:hp?c.ihp:c.ihc}; // tou (et spot sans données)
 }
 
 // ═══════════════════════ SIMULATION ENGINE ═══════════════════════
@@ -1541,6 +1718,10 @@ function mergeData(){
     }
   }
 
+  const pc=priceContext();
+  // Index PV par (mois, jour, heure, minute) : alignement calendaire en O(1) au lieu d'une recherche linéaire
+  const pvMap=new Map();
+  if(S.pvSlots&&S.pvMode!=='none')S.pvSlots.forEach(p=>{if(p.ts)pvMap.set(p.ts.getMonth()*1e6+p.ts.getDate()*1e4+p.ts.getHours()*100+p.ts.getMinutes(),p.pv);});
   const merged=consoSlots.map((s,i)=>{
     // PV — align by calendar day+time when timestamps available
     let pv=0;
@@ -1548,29 +1729,25 @@ function mergeData(){
       if(s.ts&&S.pvSlots[0]&&S.pvSlots[0].ts){
         const pvYr=S.pvSlots[0].ts.getFullYear();
         const pvTs=new Date(pvYr,s.ts.getMonth(),s.ts.getDate(),s.ts.getHours(),s.ts.getMinutes());
-        const pvIdx=S.pvSlots.findIndex(p=>p.ts&&Math.abs(p.ts-pvTs)<60000);
-        pv=pvIdx>=0?S.pvSlots[pvIdx].pv:(S.pvSlots[i%S.pvSlots.length]?.pv||0);
+        const key=pvTs.getMonth()*1e6+pvTs.getDate()*1e4+pvTs.getHours()*100+pvTs.getMinutes();
+        pv=pvMap.has(key)?pvMap.get(key):(S.pvSlots[i%S.pvSlots.length]?.pv||0);
       } else {
         pv=S.pvSlots[i%S.pvSlots.length]?.pv||0;
       }
     }
-    // Price
-    let price=null;
-    if(S.priceType==='spot'&&S.spotPrices&&S.spotPrices.length>0){
-      const pi=S.spotPrices.length>i?i:i%S.spotPrices.length;
-      price=S.spotPrices[pi].price;
-    } else if(S.priceType==='index'&&S.spotPrices&&S.spotPrices.length>0){
-      const pi=S.spotPrices.length>i?i:i%S.spotPrices.length;
-      price=S.spotPrices[pi].price+(parseFloat(el('p-idx-markup').value)||25);
-    }
     const h=s.ts?s.ts.getHours():Math.floor((i%96)*0.25);
     const dow=s.ts?s.ts.getDay():((Math.floor(i/96))%7)+1;
-    return {...s,pv,price,h,dow,hp:isHP(h,dow)};
+    const hp=isHP(h,dow);
+    const month=s.ts?s.ts.getMonth():Math.floor((i/96)/30.5)%12;
+    const pr=slotPrices(i,hp,month,pc);
+    // price : prix offtake total du quart d'heure (€/MWh), utilisé par le dispatch (seuils d'arbitrage)
+    return {...s,pv,h,dow,hp,price:pr.pOff,pOff:pr.pOff,pInj:pr.pInj};
   });
+  S.varPrice=pc.varying; // true si le prix varie à l'intérieur de la journée au-delà du HP/HC
   return merged;
 }
 
-function runDispatch(data,battCfg,scenKey){
+function runDispatch(data,battCfg,scenKey,noArb){
   const {cap,pow,effRT,socMin,socMax}=battCfg;
   const fcrFrac=(getV(scenKey+'-fcr-frac')||0)/100;
   const dt=0.25,effC=Math.sqrt(effRT),effD=Math.sqrt(effRT);
@@ -1610,7 +1787,7 @@ function runDispatch(data,battCfg,scenKey){
       const netA=netLoad+bAC;
       if(netA>peakTarget&&maxDPow>0.01){const ex=Math.min(netA-peakTarget,maxDPow+bAC);bAC=-ex;}
     }
-    if((strategy==='arbitrage'||strategy==='combined')&&bAC===0){
+    if(!noArb&&(strategy==='arbitrage'||strategy==='combined')&&bAC===0){
       const th=dayThresh[Math.floor(i/96)]||{lo:Infinity,hi:-Infinity};
       const p=s.price!==null&&s.price!==undefined?s.price:(s.hp?getV('p-offtake-hp'):getV('p-offtake-hc'));
       if(p<th.lo&&maxCPow>0.01)bAC=maxCPow;
@@ -1624,29 +1801,31 @@ function runDispatch(data,battCfg,scenKey){
   return res;
 }
 
-function calcRevenues(baseline,sim,scenKey){
-  const dt=0.25;
-  let autoSav=0;
+// Économie sur la facture d'énergie (soutirage évité + injection supplémentaire), prix du quart d'heure
+function energySavings(baseline,sim){
+  let v=0;
   for(let i=0;i<baseline.length;i++){
     const b=baseline[i],s=sim[i];
-    const t=getTariff(b.h,b.dow,S.priceType)/1000;
-    const ti=getInjectTariff(b.h,b.dow)/1000;
-    autoSav+=(Math.max(0,b.netGrid)-Math.max(0,s.netGrid))*t*dt;
-    autoSav+=(Math.max(0,-s.netGrid)-Math.max(0,-b.netGrid))*ti*dt;
+    v+=(Math.max(0,b.netGrid)-Math.max(0,s.netGrid))*b.pOff/1000*0.25;
+    v+=(Math.max(0,-s.netGrid)-Math.max(0,-b.netGrid))*b.pInj/1000*0.25;
   }
-  // Peak shaving
-  const mPB=mPeaks(baseline),mPA=mPeaks(sim);
-  let peakSav=0;
-  for(let m=0;m<12;m++)peakSav+=Math.max(0,(mPB[m]||0)-(mPA[m]||0))*(parseFloat(el('p-monthly-peak').value)||6.76);
-  peakSav+=Math.max(0,Math.max(...Object.values(mPB))-Math.max(...Object.values(mPA)))*(parseFloat(el('p-yearly-peak').value)||40.54);
-  // Arbitrage
-  let arb=0;
+  return v;
+}
+// simNoArb : même dispatch sans l'étape arbitrage. Quand le prix varie dans la journée (spot 15 min),
+// l'effet de l'arbitrage est déjà contenu dans la facture simulée : on l'isole par différence
+// (économie totale - économie sans arbitrage) au lieu de l'ajouter une seconde fois.
+function calcRevenues(baseline,simFull,scenKey,simNoArb){
+  const dt=0.25;
   const arbMode=el(scenKey+'-arb-mode')?.value||'auto';
-  const hasSpot=sim.some(s=>s.price!==null&&s.price!==undefined);
-  if(arbMode!=='disabled'){
-    if(hasSpot&&arbMode!=='tou'){
-      for(let i=0;i<sim.length;i++){const s=sim[i];if(s.price)arb+=-s.bAC*(s.price||0)*dt/1000;}
-    } else {
+  const useDiff=S.varPrice&&arbMode==='auto'&&simNoArb;
+  const sim=(S.varPrice&&arbMode!=='auto'&&simNoArb)?simNoArb:simFull;
+  let autoSav,arb=0;
+  if(useDiff){
+    autoSav=energySavings(baseline,simNoArb);
+    arb=energySavings(baseline,simFull)-autoSav;
+  } else {
+    autoSav=energySavings(baseline,sim);
+    if(arbMode!=='disabled'){
       const spread=getV(scenKey+'-arb-spread')||0;
       const cycles=getV(scenKey+'-arb-cycles')||0;
       const cap=parseFloat(el('batt-cap').value)||215;
@@ -1654,6 +1833,11 @@ function calcRevenues(baseline,sim,scenKey){
       arb=spread/1000*cap*eff*cycles*365;
     }
   }
+  // Peak shaving
+  const mPB=mPeaks(baseline),mPA=mPeaks(sim);
+  let peakSav=0;
+  for(let m=0;m<12;m++)peakSav+=Math.max(0,(mPB[m]||0)-(mPA[m]||0))*(parseFloat(el('p-monthly-peak').value)||6.76);
+  peakSav+=Math.max(0,Math.max(...Object.values(mPB))-Math.max(...Object.values(mPA)))*(parseFloat(el('p-yearly-peak').value)||40.54);
   // FCR
   const pow=parseFloat(el('batt-pow').value)||100;
   const fcrF=(getV(scenKey+'-fcr-frac')||0)/100,fcrA=(getV(scenKey+'-fcr-avail')||0)/100,fcrP=getV(scenKey+'-fcr-price')||0;
@@ -1726,7 +1910,7 @@ function calcFin(rev){
   // Payback: cumulative (bruts - agg - opsD) >= capex
   const payback=(()=>{let cp=0;for(let i=0;i<cfs.length;i++){const inf=Math.pow(1+infla,i);const net=(rev.total-aggFees-opex-ems)*inf;cp+=net;if(cp>=capex)return i+(capex-(cp-net))/net;}return null;})();
   return {capex,cap:capex,equity,debt,realAnnuity,contractualDeduction,rev,
-    aggFees,opex,ems,totalDeductions,netRev:netRev0,
+    aggFees,opex,ems,totalDeductions,deductions:totalDeductions,netRev:netRev0,
     cfs,cfsC,cfTotal,cfMoy,npv,irr:irrV,payback,
     ip:invBase>0?(npv+invBase)/invBase:0,dur,wgiShare,netRevs,
     annuity:realAnnuity};
@@ -1750,7 +1934,8 @@ function runSimulation(){
   setTimeout(()=>{
     const baseline=data.map(s=>({...s,bAC:0,netGrid:s.cons-s.pv,soc:0}));
     const simC=runDispatch(data,battCfg,'cons'),simB=runDispatch(data,battCfg,'base'),simO=runDispatch(data,battCfg,'opti');
-    const revC=calcRevenues(baseline,simC,'cons'),revB=calcRevenues(baseline,simB,'base'),revO=calcRevenues(baseline,simO,'opti');
+    const naC=runDispatch(data,battCfg,'cons',true),naB=runDispatch(data,battCfg,'base',true),naO=runDispatch(data,battCfg,'opti',true);
+    const revC=calcRevenues(baseline,simC,'cons',naC),revB=calcRevenues(baseline,simB,'base',naB),revO=calcRevenues(baseline,simO,'opti',naO);
     const finB=calcFin(revB),finC=calcFin(revC),finO=calcFin(revO);
     S.simResults={baseline,simB,revC,revB,revO,finB,finC,finO,battCfg,data};
     next();
@@ -1855,6 +2040,7 @@ function setInputMode(section, mode, btn) {
   const container = btn.closest('.input-mode-tabs').parentElement;
   container.querySelectorAll('.imt').forEach(b => b.classList.remove('active'));
   btn.classList.add('active');
+  ['profile','invoice'].forEach(m=>{const e=el(section+'-'+m+'-mode');if(e)e.style.display=mode===m?'':'none';});
   const pasteEl = el(section + '-paste-mode');
   const fileEl  = el(section + '-file-mode');
   const pdfEl   = el(section + '-pdf-mode');
@@ -2119,6 +2305,269 @@ function generateSlotsFromMonthly(monthlyKwh, year) {
   }
   return slots;
 }
+
+// ═══════════════════════ PROFILS DE CONSOMMATION TYPES ═══════════════════════
+// Poids horaires relatifs (0-23h) par type de jour + saisonnalité mensuelle (jan-déc).
+// Les valeurs sont des formes génériques, pas des mesures : à remplacer par des profils SLP/GRD si disponibles.
+const LOAD_PROFILES={
+  bureau:{label:'Bureau / tertiaire',
+    desc:'Occupation lun-ven 8h-18h, talon nocturne ~28 % (serveurs, veilles, ventilation), week-end au talon. Hiver plus élevé (chauffage d\'appoint, éclairage).',
+    wd:[.28,.28,.28,.28,.28,.28,.40,.70,1,1,1,1,.95,1,1,1,1,.85,.60,.45,.32,.30,.28,.28],
+    sat:Array(24).fill(.27),sun:Array(24).fill(.26),
+    season:[1.18,1.14,1.05,.95,.90,.90,.93,.88,.93,1.00,1.08,1.16]},
+  supermarche:{label:'Supermarché / commerce',
+    desc:'Ouverture lun-sam ~8h-20h, froid commercial en continu (talon ~55 %), dimanche fermé au talon. Été plus élevé (froid, climatisation).',
+    wd:[.55,.55,.55,.55,.55,.58,.65,.85,.97,1,1,1,1,1,1,1,1,1,1,.97,.80,.62,.57,.55],
+    sat:null,sun:Array(24).fill(.55),
+    season:[.95,.93,.95,.97,1.02,1.08,1.13,1.10,1.02,.96,.94,.97]},
+  industrie:{label:'Industrie (2 postes)',
+    desc:'Production lun-ven 6h-22h, nuit ~35 %, samedi 40 %, dimanche 32 %. Creux en août (congés).',
+    wd:[.35,.35,.35,.35,.35,.45,.90,1,1,1,1,.95,.95,1,1,1,1,1,1,1,1,.95,.50,.38],
+    sat:Array(24).fill(.40),sun:Array(24).fill(.32),
+    season:[1.02,1.03,1.02,1.00,1.00,1.00,.96,.82,1.01,1.03,1.04,.98]},
+  neutre:{label:'Neutre (plat)',
+    desc:'Consommation constante 24h/24, 7j/7, sans saisonnalité. Utile comme hypothèse prudente (aucun peak shaving possible).',
+    wd:Array(24).fill(1),sat:null,sun:null,season:Array(12).fill(1)},
+};
+function hashUnit(n){return ((n*2654435761)>>>0)%10000/10000;}
+// Forme 15 min (poids relatifs, moyenne ~1) pour une année complète
+function buildProfileShape(type,year){
+  const P=LOAD_PROFILES[type]||LOAD_PROFILES.neutre;
+  const sm=P.season.reduce((a,b)=>a+b,0)/12;
+  const noise=type==='neutre'?0:0.10;
+  const out=[];
+  const n=(isLeap(year)?366:365)*96;
+  for(let i=0;i<n;i++){
+    const ts=new Date(year,0,1,0,i*15);
+    const dow=ts.getDay(),h=ts.getHours(),q=ts.getMinutes()/60;
+    const day=dow===0?(P.sun||P.sat||P.wd):dow===6?(P.sat||P.wd):P.wd;
+    const v=day[h]+(day[(h+1)%24]-day[h])*q; // interpolation linéaire dans l'heure
+    const w=v*P.season[ts.getMonth()]/sm*(1+noise*(hashUnit(i+year*7919)-0.5));
+    out.push({ts,w:Math.max(0,w)});
+  }
+  return out;
+}
+// Étire les valeurs autour de leur moyenne pour que le max atteigne la pointe cible, énergie conservée
+function calibratePeak(vals,target){
+  if(!target||vals.length===0)return vals;
+  const E=vals.reduce((a,b)=>a+b,0);
+  for(let it=0;it<4;it++){
+    const m=vals.reduce((a,b)=>a+b,0)/vals.length,M=Math.max(...vals);
+    if(M<=m||target<=m)break;
+    const k=(target-m)/(M-m);
+    for(let j=0;j<vals.length;j++)vals[j]=Math.max(0,m+k*(vals[j]-m));
+    const E2=vals.reduce((a,b)=>a+b,0);if(E2>0)for(let j=0;j<vals.length;j++)vals[j]*=E/E2;
+  }
+  return vals;
+}
+function setConsoGenerated(slots,title,extraChips){
+  S.conso=slots;
+  const totalC=slots.reduce((a,b)=>a+b.cons,0)*0.25/1000;
+  const maxPk=Math.max(...slots.map(s=>s.cons));
+  el('stats-conso-gen').innerHTML=`
+    <div class="chip"><div class="chip-l">Source</div><div class="chip-v" style="font-size:.7rem">${title}</div></div>
+    <div class="chip"><div class="chip-l">Points 15 min</div><div class="chip-v">${fmt(slots.length)}</div></div>
+    <div class="chip green"><div class="chip-l">Conso annuelle</div><div class="chip-v">${fmt(totalC,1)} MWh</div></div>
+    <div class="chip"><div class="chip-l">Pointe</div><div class="chip-v">${fmt(maxPk,0)} kW</div></div>${extraChips||''}`;
+  document.querySelector('.stab2[data-sub="s-conso"]').classList.add('ready');
+  updateBadge();
+}
+function generateConsoFromProfile(){
+  const type=el('prof-type').value,year=parseInt(el('prof-year').value)||2025;
+  const annual=getV('prof-annual')*1000,peak=getV('prof-peak');
+  if(annual<=0){alert('Indiquez la consommation annuelle.');return;}
+  const shape=buildProfileShape(type,year);
+  const ws=shape.reduce((a,b)=>a+b.w,0)*0.25;
+  let vals=shape.map(s=>s.w*annual/ws);
+  if(peak>0)vals=calibratePeak(vals,peak);
+  setConsoGenerated(shape.map((s,i)=>({ts:s.ts,cons:vals[i],inj:0})),'Profil '+LOAD_PROFILES[type].label,
+    peak>0?'':'<div class="chip orange"><div class="chip-l">Attention</div><div class="chip-v" style="font-size:.66rem">Pointe non calée</div></div>');
+}
+
+// ═══════════════════════ IMPORT FACTURES D'ÉNERGIE (PDF) ═══════════════════════
+// Nombre au format belge : "46.511" (milliers) ou "113,5848" / "2.032,18" (décimales)
+function bnum(s){if(s==null)return null;s=String(s).trim().replace(/\s/g,'');if(/,\d+$/.test(s))s=s.replace(/\./g,'').replace(',','.');else if(/^\d{1,3}(\.\d{3})+$/.test(s))s=s.replace(/\./g,'');const v=parseFloat(s);return isNaN(v)?null:v;}
+const FR_MONTHS={janvier:0,'février':1,fevrier:1,mars:2,avril:3,mai:4,juin:5,juillet:6,'août':7,aout:7,septembre:8,octobre:9,novembre:10,'décembre':11,decembre:11};
+// Extraction ciblée sur le format ENGIE/Electrabel (blocs "Données de mesure" et "Données de facturation").
+// Pour un autre fournisseur, ajouter des variantes de regex ici.
+function parseInvoiceText(raw){
+  const t=raw.replace(/\s+/g,' ');
+  const g=re=>{const m=t.match(re);return m?m[1]:null;};
+  const N='([\\d\\.]+(?:,\\d+)?)';
+  const per=t.match(/P[ée]riode\s+(\d{2})\/(\d{2})\/(\d{4})\s*-\s*(\d{2})\/(\d{2})\/(\d{4})/);
+  if(!per)return null;
+  const inv={start:new Date(+per[3],+per[2]-1,+per[1]),end:new Date(+per[6],+per[5]-1,+per[4])};
+  const fd=t.match(/Facture du (\d{1,2}) ([^\s\d]+) (\d{4})/);
+  inv.factDate=fd?new Date(+fd[3],FR_MONTHS[fd[2].toLowerCase()]??0,+fd[1]):null;
+  inv.docNo=g(/N°\s*Document\.?\s*([\d ]{9,15}\d)/);
+  inv.ean=g(/EAN\s*:?\s*(\d{18})/);
+  inv.pHP=bnum(g(new RegExp('Puissance heures pleines\\s+'+N+'\\s*kW')));
+  inv.pHC=bnum(g(new RegExp('Puissance heures creuses\\s+'+N+'\\s*kW')));
+  const line=lbl=>t.match(new RegExp('Consom\\. heures '+lbl+'\\s+'+N+'\\s*MWh\\s+'+N+'\\s*EUR/MWh(?:\\s+'+N+'\\s*\\+\\s*\\(\\s*'+N+'\\s*x\\s*([A-Za-z]+)\\s*\\))?\\s*'+N+'\\s*EUR'));
+  for(const [k,lbl] of [['HP','pleines'],['HC','creuses']]){
+    const m=line(lbl);
+    if(m){inv['e'+k]=bnum(m[1]);inv['prix'+k]=bnum(m[2]);inv['a'+k]=bnum(m[3]);inv['b'+k]=bnum(m[4]);if(m[5])inv.indexName=m[5];inv['amt'+k]=bnum(m[6]);}
+    else{const kwh=bnum(g(new RegExp('Consom\\. heures '+lbl+'\\s+'+N+'\\s*kWh')));inv['e'+k]=kwh!=null?kwh/1000:null;}
+  }
+  inv.index=bnum(g(new RegExp('(?:PowerClick|Index|Indice)[A-Za-z ]*=\\s*'+N+'\\s*EUR/MWh')));
+  inv.annual=bnum(g(new RegExp('Consommation annuelle\\s*:\\s*'+N+'\\s*MWh')));
+  inv.prixMoyen=bnum(g(new RegExp('Prix moyen\\s*:\\s*'+N+'\\s*EUR/MWh')));
+  inv.reseau=bnum(g(new RegExp('Total co[uû]ts de r[ée]seaux\\s+'+N+'\\s*EUR')));
+  const mt=[...t.matchAll(new RegExp('Montant de la facture pour la p[ée]riode[^:]*:\\s*'+N+'\\s*EUR','g'))].map(m=>bnum(m[1])||0);
+  inv.totalHT=mt.length?mt.reduce((a,b)=>a+b,0):null;
+  inv.eTot=(inv.eHP||0)+(inv.eHC||0);
+  if(inv.totalHT&&inv.eTot){
+    inv.reseauMWh=(inv.reseau||0)/inv.eTot;
+    inv.autresMWh=(inv.totalHT-(inv.amtHP||0)-(inv.amtHC||0)-(inv.reseau||0))/inv.eTot;
+  }
+  return inv.eTot>0?inv:null;
+}
+function handleInvoiceDrop(e){e.preventDefault();el('invoice-upload-zone').classList.remove('drag');handleInvoiceFiles(e.dataTransfer.files);}
+async function handleInvoiceFiles(files){
+  const txt=el('invoice-upload-text');const errs=[];
+  for(const file of files){
+    if(!/\.pdf$/i.test(file.name)){errs.push(file.name+' (pas un PDF)');continue;}
+    txt.textContent=`⏳ Lecture de "${file.name}"...`;
+    try{
+      const pdf=await pdfjsLib.getDocument({data:await file.arrayBuffer()}).promise;
+      let full='';
+      for(let p=1;p<=pdf.numPages;p++){const c=await (await pdf.getPage(p)).getTextContent();full+=c.items.map(i=>i.str).join(' ')+'\n';}
+      const inv=parseInvoiceText(full);
+      if(!inv){errs.push(file.name+' (format non reconnu)');continue;}
+      inv.file=file.name;
+      // Rectificatives : une seule facture par période, la plus récente l'emporte
+      const k=inv.start.getTime();
+      const ex=S.invoices.findIndex(x=>x.start.getTime()===k);
+      if(ex>=0){const old=S.invoices[ex];if(!old.factDate||(inv.factDate&&inv.factDate>=old.factDate))S.invoices[ex]=inv;}
+      else S.invoices.push(inv);
+    }catch(e){errs.push(file.name+' ('+e.message+')');}
+  }
+  S.invoices.sort((a,b)=>a.start-b.start);
+  txt.textContent=S.invoices.length?`✓ ${S.invoices.length} facture(s) retenue(s)`:'Glisser-déposer une ou plusieurs factures PDF';
+  el('invoice-upload-zone').classList.toggle('loaded',S.invoices.length>0);
+  renderInvoiceTable(errs);
+}
+function renderInvoiceTable(errs){
+  const I=S.invoices;
+  el('invoice-actions').classList.toggle('hidden',!I.length);
+  if(!I.length){el('invoice-table').innerHTML='';return;}
+  const last=I[I.length-1];
+  if(last.annual)el('inv-annual').value=last.annual;
+  const f2=v=>v==null?'—':fmt(v,2),f1=v=>v==null?'—':fmt(v,1),f0=v=>v==null?'—':fmt(v,0);
+  const form=(a,b)=>a!=null&&b!=null?`${fmt(a,2)} + ${fmt(b,3)}×idx`:'—';
+  el('invoice-table').innerHTML=`<table><thead><tr><th>Période</th><th>Facture</th><th>HP MWh</th><th>HC MWh</th><th>Pmax HP kW</th><th>Pmax HC kW</th><th>Prix HP</th><th>Prix HC</th><th>Formule HP</th><th>Formule HC</th><th>${last.indexName||'Index'}</th><th>Réseau €/MWh</th><th>Autres €/MWh</th><th>Prix moyen</th></tr></thead><tbody>${
+    I.map(i=>`<tr><td>${i.start.toLocaleDateString('fr-BE')} → ${i.end.toLocaleDateString('fr-BE')}</td><td>${i.factDate?i.factDate.toLocaleDateString('fr-BE'):'—'}</td><td>${f2(i.eHP)}</td><td>${f2(i.eHC)}</td><td>${f0(i.pHP)}</td><td>${f0(i.pHC)}</td><td>${f2(i.prixHP)}</td><td>${f2(i.prixHC)}</td><td>${form(i.aHP,i.bHP)}</td><td>${form(i.aHC,i.bHC)}</td><td>${f2(i.index)}</td><td>${f1(i.reseauMWh)}</td><td>${f1(i.autresMWh)}</td><td>${f2(i.prixMoyen)}</td></tr>`).join('')
+  }</tbody></table>
+  <div class="ib" style="margin-top:6px;font-size:.68rem">${I.length} mois couvert(s) sur 12. Consommation annuelle glissante (dernière facture) : <strong>${last.annual?fmt(last.annual,1)+' MWh':'non trouvée'}</strong>. Les mois manquants seront complétés à partir de cette valeur et de la saisonnalité du profil type.
+  ${errs&&errs.length?'<br/>⚠️ Non lus : '+errs.join(', '):''}</div>`;
+}
+function generateConsoFromInvoices(){
+  const I=S.invoices;if(!I.length){alert('Aucune facture importée.');return;}
+  const type=el('inv-prof-type').value,year=parseInt(el('inv-year').value)||2025;
+  const shape=buildProfileShape(type,year);
+  const vals=shape.map(s=>s.w);
+  const byMonth={};I.forEach(i=>{byMonth[i.start.getMonth()]=i;}); // mapping par mois calendaire
+  const idx=Array.from({length:12},()=>({hp:[],hc:[],all:[]}));
+  shape.forEach((s,j)=>{const m=s.ts.getMonth();const hp=isHP(s.ts.getHours(),s.ts.getDay());idx[m][hp?'hp':'hc'].push(j);idx[m].all.push(j);});
+  const sumIdx=a=>a.reduce((x,j)=>x+vals[j],0);
+  const scaleTo=(a,kwh)=>{const w=sumIdx(a)*0.25;if(w>0)a.forEach(j=>vals[j]*=kwh/w);};
+  const peakCal=(a,p)=>{if(!p||!a.length)return;const v=calibratePeak(a.map(j=>vals[j]),p);a.forEach((j,k)=>vals[j]=v[k]);};
+  // 1) mois facturés : énergie HP/HC + pointes HP/HC
+  let known=0;const ratios=[];
+  for(let m=0;m<12;m++){const inv=byMonth[m];if(!inv)continue;
+    scaleTo(idx[m].hp,(inv.eHP||0)*1000);scaleTo(idx[m].hc,(inv.eHC||0)*1000);
+    const meanHP=inv.eHP*1000/(idx[m].hp.length*0.25);
+    peakCal(idx[m].hp,inv.pHP);peakCal(idx[m].hc,inv.pHC);
+    if(inv.pHP&&meanHP>0)ratios.push(inv.pHP/meanHP);
+    known+=inv.eTot*1000;}
+  // 2) mois manquants : reste de la conso annuelle, réparti selon la saisonnalité du profil
+  const missing=[...Array(12).keys()].filter(m=>!byMonth[m]);
+  if(missing.length){
+    const annual=getV('inv-annual')*1000;
+    const wMiss=missing.map(m=>sumIdx(idx[m].all));
+    let rest=annual-known;
+    if(!(annual>0)||rest<=0){ // estimation : énergie moyenne des mois connus par unité de forme
+      const knownM=[...Array(12).keys()].filter(m=>byMonth[m]);
+      const shapeKnown=knownM.reduce((a,m)=>a+sumIdx(idx[m].all),0);
+      rest=shapeKnown>0?known/shapeKnown*wMiss.reduce((a,b)=>a+b,0):0;
+    }
+    const wT=wMiss.reduce((a,b)=>a+b,0);
+    const ratio=ratios.length?ratios.reduce((a,b)=>a+b,0)/ratios.length:null;
+    missing.forEach((m,k)=>{const e=rest*wMiss[k]/wT;scaleTo(idx[m].all,e);
+      if(ratio){const hpE=sumIdx(idx[m].hp)*0.25,meanHP=hpE/(idx[m].hp.length*0.25);peakCal(idx[m].hp,ratio*meanHP);}});
+  }
+  setConsoGenerated(shape.map((s,j)=>({ts:s.ts,cons:vals[j],inj:0})),`${I.length} facture(s) + profil ${LOAD_PROFILES[type].label}`,
+    `<div class="chip"><div class="chip-l">Mois facturés / estimés</div><div class="chip-v">${12-missing.length} / ${missing.length}</div></div>`);
+}
+function applyInvoiceToContract(){
+  const I=S.invoices.filter(i=>i.eTot>0);if(!I.length)return;
+  const last=I[I.length-1],E=I.reduce((a,i)=>a+i.eTot,0);
+  const wavg=k=>I.reduce((a,i)=>a+(i[k]||0)*i.eTot,0)/E;
+  const set=(id,v)=>{if(v!=null&&!isNaN(v))el(id).value=+(+v).toFixed(3);};
+  set('p-idx-a-hp',last.aHP);set('p-idx-b-hp',last.bHP);set('p-idx-a-hc',last.aHC);set('p-idx-b-hc',last.bHC);
+  const idxs=I.filter(i=>i.index!=null);set('p-idx-value',idxs.length?idxs.reduce((a,i)=>a+i.index,0)/idxs.length:null);
+  set('p-idx-reseau',wavg('reseauMWh'));set('p-idx-autres',wavg('autresMWh'));
+  el('p-idx-source').value='fixed';
+  document.querySelector('#prix-type-pills .tpill[data-type="index"]').click();
+  updateIdxPreview();
+  alert(`Formule appliquée au contrat énergie (onglet Contrat énergie & Prix) :\nHP = ${fmt(last.aHP,2)} + ${fmt(last.bHP,3)} × ${last.indexName||'Index'}\nHC = ${fmt(last.aHC,2)} + ${fmt(last.bHC,3)} × ${last.indexName||'Index'}\nIndex moyen ${fmt(getV('p-idx-value'),2)} €/MWh · Réseau ${fmt(getV('p-idx-reseau'),1)} €/MWh · Autres ${fmt(getV('p-idx-autres'),1)} €/MWh`);
+}
+function updateIdxPreview(){
+  if(!el('idx-preview'))return;
+  const i=getV('p-idx-value'),sur=getV('p-idx-reseau')+getV('p-idx-autres');
+  const hp=getV('p-idx-a-hp')+getV('p-idx-b-hp')*i,hc=getV('p-idx-a-hc')+getV('p-idx-b-hc')*i;
+  el('idx-preview').innerHTML=`<div class="chip"><div class="chip-l">Énergie HP / HC (index fixe)</div><div class="chip-v">${fmt(hp,1)} / ${fmt(hc,1)} €/MWh</div></div>
+    <div class="chip green"><div class="chip-l">Prix total HP / HC</div><div class="chip-v">${fmt(hp+sur,1)} / ${fmt(hc+sur,1)} €/MWh</div></div>
+    <div class="chip"><div class="chip-l">Injection</div><div class="chip-v">${fmt(getV('p-idx-inj-coef')*i+getV('p-idx-inj-markup'),1)} €/MWh</div></div>`;
+}
+
+// ═══════════════════════ ANNÉE DE RÉFÉRENCE FCR / aFRR ═══════════════════════
+// Prix moyens de capacité (€/MW/h). FCR : valeurs historiques déjà utilisées dans le simulateur.
+// aFRR : milieu des fourchettes indicatives du simulateur. À mettre à jour chaque année (source ELIA / agrégateur).
+const REF_MARKET={
+  2021:{fcr:33.00,afrr:6},
+  2022:{fcr:34.82,afrr:14},
+  2023:{fcr:26.25,afrr:11},
+  2024:{fcr:43.73,afrr:13},
+  2025:{fcr:19.67,afrr:8},
+};
+function refValues(key){
+  const ys=Object.keys(REF_MARKET).map(Number).sort();
+  const avg=list=>({fcr:list.reduce((a,y)=>a+REF_MARKET[y].fcr,0)/list.length,afrr:list.reduce((a,y)=>a+REF_MARKET[y].afrr,0)/list.length});
+  if(key==='avg')return {...avg(ys),label:`moyenne ${ys[0]}-${ys[ys.length-1]}`};
+  if(key==='avg3'){const l=ys.slice(-3);return {...avg(l),label:`moyenne ${l[0]}-${l[l.length-1]}`};}
+  if(REF_MARKET[key])return {...REF_MARKET[key],label:String(key)};
+  return null;
+}
+function applyRefYear(scen){
+  const sel=el(scen+'-ref-year');const v=refValues(sel.value);const info=el(scen+'-ref-info');
+  const panel=el('scen-'+scen);
+  panel.querySelectorAll('.fcr-hist tbody tr').forEach(tr=>tr.classList.toggle('fcr-active',tr.cells[0]&&tr.cells[0].textContent.trim()===sel.value));
+  if(!v){info.innerHTML='Saisie manuelle : les prix FCR et aFRR ci-dessous sont utilisés tels quels.';return;}
+  el(scen+'-fcr-price').value=+v.fcr.toFixed(2);el(scen+'-afrr-price').value=+v.afrr.toFixed(2);
+  info.innerHTML=`Référence <strong>${v.label}</strong> : FCR <strong>${fmt(v.fcr,2)} €/MW/h</strong> · aFRR <strong>${fmt(v.afrr,2)} €/MW/h</strong>. Toute modification manuelle d'un prix bascule en « Personnalisé ».`;
+  panel.querySelectorAll('.card h2').forEach(h=>{if(/^🔄|FCR/.test(h.textContent)){const sp=h.querySelector('span');if(sp)sp.textContent=`(référence ${v.label} : ${fmt(v.fcr,2)} €/MW/h)`;}});
+}
+document.querySelectorAll('.ref-year-sel').forEach(sel=>{
+  const k=sel.dataset.scen;sel.value=sel.dataset.default;
+  sel.addEventListener('change',()=>applyRefYear(k));
+  [k+'-fcr-price',k+'-afrr-price'].forEach(id=>el(id).addEventListener('input',()=>{sel.value='custom';applyRefYear(k);}));
+  applyRefYear(k);
+});
+
+// ═══════════════════════ UI : méthode PV, profil, formule ═══════════════════════
+document.querySelectorAll('#pv-method-pills .tpill').forEach(t=>t.addEventListener('click',()=>{
+  document.querySelectorAll('#pv-method-pills .tpill').forEach(x=>x.classList.remove('active'));
+  t.classList.add('active');S.pvMethod=t.dataset.pvmethod;
+  const r=S.pvMethod==='ratio';
+  el('pv-ratio-block').classList.toggle('hidden',!r);el('pv-ratio-note').classList.toggle('hidden',!r);
+  el('pv-geo-block').classList.toggle('hidden',r);
+}));
+const profDesc=()=>{el('prof-desc').textContent=LOAD_PROFILES[el('prof-type').value].desc;};
+el('prof-type').addEventListener('change',profDesc);profDesc();
+['p-idx-a-hp','p-idx-b-hp','p-idx-a-hc','p-idx-b-hc','p-idx-value','p-idx-reseau','p-idx-autres','p-idx-inj-coef','p-idx-inj-markup'].forEach(id=>el(id).addEventListener('input',updateIdxPreview));
+el('p-idx-source').addEventListener('change',updateBadge);
+updateIdxPreview();
 
 // Init
 updateCapex();updateBadge();
