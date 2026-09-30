@@ -8,6 +8,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 <style>
 :root{
   /* We Green brand palette */
@@ -280,6 +281,64 @@ select:focus{border-color:var(--wg-green)}
 .hidden{display:none!important}
 footer{text-align:center;padding:14px;font-size:.63rem;color:var(--g400);border-top:1px solid var(--g200);background:var(--g50)}
 footer strong{color:var(--wg-green-d)}
+/* ═══ RAPPORT CLIENT PDF ═══ */
+.rp-modal{position:fixed;inset:0;background:rgba(20,20,20,.5);z-index:1000;display:flex;align-items:center;justify-content:center;padding:16px}
+.rp-modal-box{background:#fff;border-radius:12px;width:min(1260px,100%);height:94vh;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 10px 40px rgba(0,0,0,.3)}
+.rp-modal-head{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-bottom:1px solid var(--g200);background:var(--g50)}
+.rp-modal-head h2{font-family:'Montserrat',sans-serif;font-size:.95rem;color:var(--wg-gray-d)}
+.rp-modal-body{display:grid;grid-template-columns:330px 1fr;min-height:0;flex:1}
+.rp-form{padding:14px;overflow:auto;border-right:1px solid var(--g200)}
+.rp-form input[type=text],.rp-form input[type=date],.rp-form textarea{width:100%;border:1.5px solid var(--g200);border-radius:8px;padding:6px 9px;font-family:'DM Sans',sans-serif;font-size:.8rem}
+.rp-form textarea{min-height:60px;resize:vertical}
+.rp-form .chk{display:flex;gap:6px;align-items:center;font-size:.76rem;margin:4px 0}
+.rp-prev{background:#dcdcd8;overflow:auto;padding:18px}
+.rp-prev .rp-doc{zoom:.62}
+.rp-actions{display:flex;flex-direction:column;gap:7px;margin-top:12px}
+@media(max-width:800px){.rp-modal-body{grid-template-columns:1fr}.rp-prev{display:none}}
+/* Pages A4 */
+.rp-doc{font-family:'DM Sans',Arial,Helvetica,sans-serif;color:#1d1d1b;font-size:9.5pt;line-height:1.4}
+.rp-page{width:210mm;height:296mm;background:#fff;margin:0 auto 8mm;position:relative;overflow:hidden;box-shadow:0 3px 14px rgba(0,0,0,.18)}
+.rp-band{height:17mm;background:#3F4041;display:flex;align-items:center;justify-content:space-between;padding:0 14mm;color:#fff;border-bottom:1.2mm solid #C1D42F}
+.rp-band .rp-bt{font-family:'Montserrat',Arial,sans-serif;font-size:8.5pt;letter-spacing:.06em;text-transform:uppercase;color:#dfe8a0}
+.rp-body{padding:9mm 14mm 0}
+.rp-foot{position:absolute;left:14mm;right:14mm;bottom:7mm;display:flex;justify-content:space-between;font-size:7pt;color:#8a8a86;border-top:.3mm solid #e4e4e0;padding-top:2mm}
+.rp-doc h1{font-family:'Montserrat',Arial,sans-serif;font-size:21pt;line-height:1.15;color:#3F4041;margin:0 0 2mm;font-weight:800}
+.rp-doc h2{font-family:'Montserrat',Arial,sans-serif;font-size:12pt;color:#3F4041;margin:6mm 0 2.5mm;padding-bottom:1.2mm;border-bottom:.5mm solid #C1D42F;font-weight:700}
+.rp-doc h3{font-family:'Montserrat',Arial,sans-serif;font-size:9.5pt;color:#3F4041;margin:3mm 0 1.5mm}
+.rp-doc p{margin:0 0 2mm}
+.rp-sub{color:#5C5D60;font-size:10.5pt;margin-bottom:5mm}
+.rp-meta{display:grid;grid-template-columns:1fr 1fr;gap:1.5mm 8mm;background:#F8FAE9;border-left:1.2mm solid #C1D42F;padding:3.5mm 5mm;font-size:8.8pt}
+.rp-meta b{display:block;font-size:7pt;text-transform:uppercase;letter-spacing:.05em;color:#6b6b67;font-family:'Montserrat',Arial,sans-serif}
+.rp-kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:3mm;margin-top:5mm}
+.rp-kpi{border:.3mm solid #e4e4e0;border-radius:2mm;padding:3mm 3.5mm;background:#fff}
+.rp-kpi .l{font-size:6.8pt;text-transform:uppercase;letter-spacing:.05em;color:#6b6b67;font-family:'Montserrat',Arial,sans-serif;font-weight:700}
+.rp-kpi .v{font-family:'Montserrat',Arial,sans-serif;font-size:15pt;font-weight:800;color:#3F4041;margin-top:1mm;line-height:1.1}
+.rp-kpi .s{font-size:7pt;color:#8a8a86;margin-top:.8mm}
+.rp-kpi.hl{background:#3F4041;border-color:#3F4041}.rp-kpi.hl .l{color:#dfe8a0}.rp-kpi.hl .v{color:#C1D42F}.rp-kpi.hl .s{color:#c8c8c4}
+.rp-tbl{width:100%;border-collapse:collapse;font-size:8.5pt}
+.rp-tbl th{text-align:right;font-family:'Montserrat',Arial,sans-serif;font-size:7pt;text-transform:uppercase;letter-spacing:.04em;color:#5C5D60;border-bottom:.5mm solid #C1D42F;padding:1.4mm 2mm}
+.rp-tbl th:first-child,.rp-tbl td:first-child{text-align:left}
+.rp-tbl td{text-align:right;padding:1.3mm 2mm;border-bottom:.2mm solid #ecece8;font-variant-numeric:tabular-nums}
+.rp-tbl tr.tot td{font-weight:700;border-top:.4mm solid #3F4041;border-bottom:none;background:#F8FAE9}
+.rp-tbl tr.neg td{color:#9a3a1a}
+.rp-tbl tr.main td{background:#F8FAE9;font-weight:700}
+.rp-tbl .desc{display:block;font-size:7.3pt;color:#6b6b67;font-weight:400;margin-top:.4mm;line-height:1.3}
+.rp-two{display:grid;grid-template-columns:1fr 1fr;gap:7mm}
+.rp-note{font-size:8pt;color:#5C5D60;background:#f5f5f2;border-radius:1.5mm;padding:2.5mm 3.5mm;margin-top:2.5mm}
+.rp-alloc{display:flex;height:7mm;border-radius:1.5mm;overflow:hidden;margin:2mm 0 1.5mm;font-size:7.5pt;font-weight:700;color:#fff;font-family:'Montserrat',Arial,sans-serif}
+.rp-alloc div{display:flex;align-items:center;justify-content:center;white-space:nowrap;overflow:hidden}
+.rp-list{margin:0;padding-left:4.5mm;font-size:8.5pt}.rp-list li{margin-bottom:1.2mm}
+.rp-sign{margin-top:6mm;display:grid;grid-template-columns:1fr 1fr;gap:8mm;font-size:8.8pt}
+#print-root{display:none}
+@media print{
+  @page{size:A4;margin:0}
+  html,body{background:#fff!important}
+  body.rp-printing>*:not(#print-root){display:none!important}
+  body.rp-printing #print-root{display:block}
+  #print-root .rp-page{margin:0;box-shadow:none;height:297mm;break-after:page;page-break-after:always}
+  #print-root .rp-page:last-child{break-after:auto;page-break-after:auto}
+  *{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+}
 </style>
 </head>
 <body>
@@ -1129,7 +1188,10 @@ footer strong{color:var(--wg-green-d)}
   <div id="res-content" class="hidden">
     <div class="res-header">
       <div><div class="res-title" id="res-title">—</div><div class="res-sub" id="res-sub">—</div></div>
-      <button class="btn btn-secondary" onclick="exportCSV()">📥 Export CSV</button>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn btn-primary" onclick="openReportModal()">📄 Rapport client PDF</button>
+        <button class="btn btn-secondary" onclick="exportCSV()">📥 Export CSV</button>
+      </div>
     </div>
     <div class="kg" id="res-kpis"></div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px">
@@ -1157,7 +1219,37 @@ footer strong{color:var(--wg-green-d)}
 </div>
 
 </main>
-<footer>We Green Invest · Simulateur BESS v2.2 · PV simulé sur profil météo typique belge · Dispatch sur données réelles · Confidentiel</footer>
+<footer>We Green Invest · Simulateur BESS v2.3 · PV simulé sur profil météo typique belge · Dispatch sur données réelles · Confidentiel</footer>
+
+<!-- ═══ MODALE RAPPORT CLIENT ═══ -->
+<div id="report-modal" class="rp-modal hidden" onclick="if(event.target===this)closeReportModal()">
+  <div class="rp-modal-box">
+    <div class="rp-modal-head"><h2>📄 Rapport client PDF</h2><button class="btn btn-secondary" onclick="closeReportModal()">✕ Fermer</button></div>
+    <div class="rp-modal-body">
+      <div class="rp-form">
+        <div class="ib" style="margin-bottom:10px;font-size:.7rem">Document destiné au client : il reprend les résultats de la dernière simulation, sans les données internes (marges, TRI de l'investisseur en tiers-investissement). Vérifiez l'aperçu avant l'envoi.</div>
+        <div class="f"><label>Client</label><input type="text" id="rp-client" oninput="refreshReport()"/></div>
+        <div class="f"><label>Adresse du site</label><input type="text" id="rp-site" oninput="refreshReport()"/></div>
+        <div class="f"><label>Référence du projet</label><input type="text" id="rp-ref" oninput="refreshReport()"/></div>
+        <div class="f"><label>Date</label><input type="date" id="rp-date" oninput="refreshReport()"/></div>
+        <div class="f"><label>Société émettrice</label><input type="text" id="rp-issuer" oninput="refreshReport()"/></div>
+        <div class="f"><label>Contact (nom, e-mail, téléphone)</label><input type="text" id="rp-contact" oninput="refreshReport()"/></div>
+        <div class="f"><label>Scénario présenté</label>
+          <select id="rp-scen" onchange="refreshReport()"><option value="B" selected>Central (Base)</option><option value="C">Prudent (Conservateur)</option><option value="O">Favorable (Optimiste)</option></select></div>
+        <label class="chk"><input type="checkbox" id="rp-cmp" checked onchange="refreshReport()"/> Inclure la comparaison des 3 scénarios</label>
+        <label class="chk"><input type="checkbox" id="rp-before" checked onchange="refreshReport()"/> Inclure « votre site avant / après »</label>
+        <div class="f" style="margin-top:8px"><label>Message au client <span class="h">(optionnel, page 1)</span></label><textarea id="rp-msg" oninput="refreshReport()"></textarea></div>
+        <div class="rp-actions">
+          <button class="btn btn-primary" onclick="downloadReportPDF()">⬇️ Télécharger le PDF</button>
+          <button class="btn btn-secondary" onclick="printReport()">🖨 Imprimer / PDF vectoriel</button>
+          <div class="prog-lbl" id="rp-status"></div>
+        </div>
+      </div>
+      <div class="rp-prev"><div id="rp-preview" class="rp-doc"></div></div>
+    </div>
+  </div>
+</div>
+<div id="print-root" class="rp-doc"></div>
 
 <script>
 // ═══════════════════════════════ STATE ═══════════════════════════════
@@ -1504,7 +1596,7 @@ function parseConso(){
       const result = parseConsoGRD(lines, sep);
       if (!result) { alert('Format GRD détecté mais colonnes M_A+ introuvables.'); return; }
       const { slots, format } = result;
-      S.conso = slots;
+      S.conso = slots;S.consoSource='données quart-horaires du gestionnaire de réseau';
       const totalC = slots.reduce((a,b) => a + b.cons, 0) * 0.25 / 1000;
       const totalI = slots.reduce((a,b) => a + b.inj, 0) * 0.25 / 1000;
       const maxPk  = Math.max(...slots.map(s => s.cons));
@@ -1582,7 +1674,7 @@ function confirmConso(){
   // Detect unit (kWh/15min → multiply by 4 for kW)
   const avg = slots.reduce((a,b) => a+b.cons, 0) / slots.length;
   if (avg < 5) slots.forEach(s => { s.cons *= 4; s.inj *= 4; });
-  S.conso = slots;
+  S.conso = slots;S.consoSource='données quart-horaires fournies';
   const totalC = slots.reduce((a,b) => a+b.cons, 0) * 0.25 / 1000;
   const maxPk  = Math.max(...slots.map(s => s.cons));
   el('stats-conso').innerHTML = `
@@ -2495,7 +2587,7 @@ function calibratePeak(vals,target){
   return vals;
 }
 function setConsoGenerated(slots,title,extraChips){
-  S.conso=slots;
+  S.conso=slots;S.consoSource=title.replace(/^(\d)/,'$1').toLowerCase().replace('facture(s) + profil','facture(s) mensuelle(s) + profil type');
   const totalC=slots.reduce((a,b)=>a+b.cons,0)*0.25/1000;
   const maxPk=Math.max(...slots.map(s=>s.cons));
   el('stats-conso-gen').innerHTML=`
@@ -2535,6 +2627,11 @@ function parseInvoiceText(raw){
   inv.factDate=fd?new Date(+fd[3],FR_MONTHS[fd[2].toLowerCase()]??0,+fd[1]):null;
   inv.docNo=g(/N°\s*Document\.?\s*([\d ]{9,15}\d)/);
   inv.ean=g(/EAN\s*:?\s*(\d{18})/);
+  // Identité du client et adresse du site (utilisées pour pré-remplir le rapport client)
+  const cm=t.match(/\b(SRL|SA|SPRL|BV|NV|ASBL|SCRL|SC|SCS|SNC)\s+([A-Za-zÀ-ÿ0-9'&\.\- ]+?)\s+(?=(?:BOULEVARD|RUE|AVENUE|CHAUSS|PLACE|CHEMIN|ROUTE|QUAI|DR[EÈ]VE|ALL[EÉ]E|SQUARE|STRAAT|LAAN|STEENWEG|PLEIN)\b)/);
+  if(cm)inv.client=cm[1]+' '+cm[2];
+  inv.site=g(/EAN\s*:\s*\d{18}\s+(?:Votre réf\.\s+\S+\s+)?([A-ZÀ-Ü0-9'\.\- ]+?,\s*\d{4}\s+[A-ZÀ-Ü'\- ]+?)\s+(?=Facturation|Pannes|N°|Notre)/);
+  inv.tva=g(/TVA\s+(BE\s?0?\d{3}\.?\d{3}\.?\d{3})/);
   inv.pHP=bnum(g(new RegExp('Puissance heures pleines\\s+'+N+'\\s*kW')));
   inv.pHC=bnum(g(new RegExp('Puissance heures creuses\\s+'+N+'\\s*kW')));
   const line=lbl=>t.match(new RegExp('Consom\\. heures '+lbl+'\\s+'+N+'\\s*MWh\\s+'+N+'\\s*EUR/MWh(?:\\s+'+N+'\\s*\\+\\s*\\(\\s*'+N+'\\s*x\\s*([A-Za-z]+)\\s*\\))?\\s*'+N+'\\s*EUR'));
@@ -2731,6 +2828,193 @@ function updateFinModelUI(){
   ['r-equity','r-annuity'].forEach(id=>{const c=el(id)?.closest('.chip');if(c)c.style.display=pr?'none':'';});
 }
 document.querySelectorAll('.msb').forEach(b=>b.addEventListener('click',updateFinModelUI));
+
+// ═══════════════════════ RAPPORT CLIENT (PDF) ═══════════════════════
+// Construit un document A4 destiné au client à partir de S.simResults.
+// Téléchargement direct via html2pdf (image haute définition) ou impression navigateur (PDF vectoriel).
+// En tiers-investissement, les indicateurs propres à WGI (TRI, VAN, marge) ne sont jamais affichés.
+const RP_SCEN={C:'Prudent',B:'Central',O:'Favorable'};
+const esc=t=>String(t==null?'':t).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+function openReportModal(){
+  if(!S.simResults){alert('Lancez d\'abord une simulation.');return;}
+  const inv=(S.invoices||[]).slice(-1)[0]||{};
+  const set=(id,v)=>{if(!el(id).value&&v)el(id).value=v;};
+  set('rp-client',inv.client);set('rp-site',inv.site?inv.site.replace(/\b([A-ZÀ-Ü])([A-ZÀ-Ü'\-]+)/g,(m,a,b)=>a+b.toLowerCase()).replace(/\b(Du|De|Des|La|Le|Les|Aux|Au|D')\b(?!$)/g,(m,w,i)=>i===0?w:w.toLowerCase()):'');
+  set('rp-date',new Date().toISOString().slice(0,10));
+  el('rp-issuer').value=el('rp-issuer').value||(S.simResults.finB.model==='propres'?'We Green Energy SRL':'We Green Invest SRL');
+  el('report-modal').classList.remove('hidden');
+  refreshReport();
+}
+function closeReportModal(){el('report-modal').classList.add('hidden');}
+function refreshReport(){el('rp-preview').innerHTML=buildReportHTML();}
+function rpOpts(){return {client:el('rp-client').value.trim()||'Client',site:el('rp-site').value.trim(),ref:el('rp-ref').value.trim(),
+  date:el('rp-date').value?new Date(el('rp-date').value).toLocaleDateString('fr-BE',{day:'numeric',month:'long',year:'numeric'}):'',
+  issuer:el('rp-issuer').value.trim()||'We Green',contact:el('rp-contact').value.trim(),scen:el('rp-scen').value,
+  cmp:el('rp-cmp').checked,before:el('rp-before').checked,msg:el('rp-msg').value.trim()};}
+const rpLogo=`<svg width="120" height="38" viewBox="0 0 220 72" xmlns="http://www.w3.org/2000/svg"><circle cx="36" cy="36" r="33" fill="none" stroke="#C1D42F" stroke-width="3" stroke-dasharray="180 30" stroke-linecap="round"/><text x="21" y="44" font-family="Arial Black,Arial,sans-serif" font-weight="900" font-size="20" fill="#f0f0f0">we</text><text x="74" y="42" font-family="Arial,sans-serif" font-weight="700" font-size="22" fill="#C1D42F">green</text><text x="97" y="55" font-family="Arial,sans-serif" font-size="8" fill="#C1D42F" letter-spacing="2">BEYOND ENERGY</text></svg>`;
+function rpPage(n,N,o,title,inner){
+  return `<div class="rp-page"><div class="rp-band">${rpLogo}<div class="rp-bt">${esc(title)}</div></div><div class="rp-body">${inner}</div>
+  <div class="rp-foot"><span>${esc(o.issuer)} · Étude indicative, non contractuelle${o.ref?' · Réf. '+esc(o.ref):''}</span><span>${esc(o.client)} · ${n} / ${N}</span></div></div>`;
+}
+// Barres horizontales des sources de gains
+function rpBarsSVG(items){
+  const it=items.filter(x=>x[1]>0.5);if(!it.length)return '';
+  const W=520,rowH=26,H=it.length*rowH+6,max=Math.max(...it.map(x=>x[1])),lw=150,bw=W-lw-80;
+  return `<svg viewBox="0 0 ${W} ${H}" width="100%" xmlns="http://www.w3.org/2000/svg" font-family="Arial,sans-serif">${it.map((x,i)=>{const y=i*rowH+4,w=Math.max(2,x[1]/max*bw);
+    return `<text x="0" y="${y+14}" font-size="11" fill="#3F4041">${esc(x[0])}</text><rect x="${lw}" y="${y+3}" width="${w}" height="15" rx="3" fill="${x[2]}"/><text x="${lw+w+6}" y="${y+14.5}" font-size="11" font-weight="700" fill="#3F4041">${fE(x[1],0)}</text>`;}).join('')}</svg>`;
+}
+// Position de trésorerie cumulée (année 0 = investissement)
+function rpCumSVG(vals){
+  const W=520,H=190,pl=52,pr=8,pt=12,pb=24,n=vals.length;
+  const mn=Math.min(0,...vals),mx=Math.max(0,...vals),sp=(mx-mn)||1;
+  const y=v=>pt+(mx-v)/sp*(H-pt-pb),bw=(W-pl-pr)/n*0.7,x=i=>pl+(i+0.15)*(W-pl-pr)/n;
+  const step=Math.pow(10,Math.floor(Math.log10(sp/4)));const tick=[1,2,2.5,5,10].map(m=>m*step).find(t=>sp/t<=5)||step*10;
+  let g='';for(let t=Math.ceil(mn/tick)*tick;t<=mx+1e-9;t+=tick)g+=`<line x1="${pl}" x2="${W-pr}" y1="${y(t)}" y2="${y(t)}" stroke="${t===0?'#3F4041':'#e4e4e0'}" stroke-width="${t===0?1.2:0.6}"/><text x="${pl-5}" y="${y(t)+3.5}" font-size="9" fill="#6b6b67" text-anchor="end">${fmt(t/1000,0)} k€</text>`;
+  const bars=vals.map((v,i)=>`<rect x="${x(i)}" y="${Math.min(y(v),y(0))}" width="${bw}" height="${Math.max(1,Math.abs(y(v)-y(0)))}" rx="2" fill="${v<0?'#9a9a96':'#8BA31F'}"/>`+(i%(n>12?2:1)===0||i===n-1?`<text x="${x(i)+bw/2}" y="${H-8}" font-size="9" fill="#6b6b67" text-anchor="middle">${i}</text>`:'')).join('');
+  return `<svg viewBox="0 0 ${W} ${H}" width="100%" xmlns="http://www.w3.org/2000/svg" font-family="Arial,sans-serif">${g}${bars}<text x="${W-pr}" y="${H-0}" font-size="8.5" fill="#8a8a86" text-anchor="end">années</text></svg>`;
+}
+const RP_SRC=[
+  ['autoconso','Autoconsommation','#16a34a','Le surplus solaire est stocké puis consommé sur place au lieu d\'être injecté au réseau à bas prix.'],
+  ['peak','Réduction des pointes','#2563eb','La batterie écrête les pointes de puissance, ce qui réduit la part capacitaire de la facture réseau.'],
+  ['arb','Achat au meilleur moment','#7c3aed','La batterie se charge quand l\'électricité est la moins chère et restitue l\'énergie quand elle est la plus chère.'],
+  ['fcr','Service réseau FCR','#0B5A8A','Une partie de la puissance est mise à disposition d\'Elia pour stabiliser la fréquence du réseau, rémunérée via un agrégateur.'],
+  ['afrr','Service réseau aFRR','#FF9D01','Réserve automatique d\'Elia pour rétablir l\'équilibre du réseau, rémunérée à la puissance mise à disposition.'],
+  ['imbal','Marché du déséquilibre','#6b7280','La flexibilité libre est valorisée sur le marché du déséquilibre, via un agrégateur.'],
+];
+function buildReportHTML(){
+  const o=rpOpts(),R=S.simResults,r=R['rev'+o.scen],f=R['fin'+o.scen],m=f.model,rows=f.rows,r0=rows[0];
+  const cap=getV('batt-cap'),pow=getV('batt-pow'),al=r.alloc,dur=f.dur;
+  const pvK=S.pvMode==='none'?0:(S.pvMode==='simulate'?getV('pv-kwc'):null);
+  const pvMWh=R.baseline.reduce((a,b)=>a+b.pv*0.25,0)/1000,consoMWh=R.baseline.reduce((a,b)=>a+b.cons*0.25,0)/1000;
+  const clientCum=rows.reduce((a,x)=>a+x.client,0);
+  const invClient=m==='propres'?f.capex:0;
+  const netGain=clientCum-invClient;
+  const N=4+(o.cmp||o.before?0:0);
+  // ---- Page 1 : synthèse ----
+  let k='';
+  if(m==='propres')k=`<div class="rp-kpi"><div class="l">Investissement</div><div class="v">${fE(f.capex,0)}</div><div class="s">HTVA, installation comprise</div></div>
+    <div class="rp-kpi"><div class="l">Gain net an 1</div><div class="v">${fE(r0.client,0)}</div><div class="s">après frais et maintenance</div></div>
+    <div class="rp-kpi"><div class="l">Retour sur investissement</div><div class="v">${f.payback?fmt(f.payback,1)+' ans':'> '+dur+' ans'}</div><div class="s">temps de retour simple</div></div>
+    <div class="rp-kpi hl"><div class="l">Gain net sur ${dur} ans</div><div class="v">${fE(netGain,0)}</div><div class="s">${f.irr?'rendement (TRI) '+fmt(f.irr*100,1)+' %':'investissement déduit'}</div></div>`;
+  else if(m==='tiers')k=`<div class="rp-kpi"><div class="l">Votre investissement</div><div class="v">0 €</div><div class="s">financé par ${esc(o.issuer)}</div></div>
+    <div class="rp-kpi"><div class="l">Votre gain an 1</div><div class="v">${fE(r0.client,0)}</div><div class="s">${fmt(100-f.wgiShare*100)} % des revenus nets</div></div>
+    <div class="rp-kpi"><div class="l">Durée du contrat</div><div class="v">${dur} ans</div><div class="s">maintenance incluse</div></div>
+    <div class="rp-kpi hl"><div class="l">Gain cumulé sur ${dur} ans</div><div class="v">${fE(clientCum,0)}</div><div class="s">sans investissement</div></div>`;
+  else k=`<div class="rp-kpi"><div class="l">Loyer annuel</div><div class="v">${fE(r0.lease,0)}</div><div class="s">sur ${dur} ans</div></div>
+    <div class="rp-kpi"><div class="l">Revenus nets an 1</div><div class="v">${fE(r0.nets,0)}</div><div class="s">avant loyer</div></div>
+    <div class="rp-kpi"><div class="l">Gain net an 1</div><div class="v">${fE(r0.client,0)}</div><div class="s">après loyer</div></div>
+    <div class="rp-kpi hl"><div class="l">Gain cumulé sur ${dur} ans</div><div class="v">${fE(clientCum,0)}</div><div class="s">sans investissement</div></div>`;
+  const shareTxt=m==='tiers'?`Dans le modèle de tiers-investissement, ${esc(o.issuer)} finance et exploite la batterie ; vous percevez ${fmt(100-f.wgiShare*100)} % des revenus nets, sans aucun investissement.`
+    :m==='leasing'?`La batterie est mise à disposition en leasing par ${esc(o.issuer)} contre un loyer annuel fixe ; vous conservez les économies et revenus générés.`
+    :`Vous achetez la batterie et conservez l'intégralité des économies et revenus générés.`;
+  const seg=(w,c,t)=>w>0?`<div style="width:${w}%;background:${c}">${w>=14?t+' '+fmt(w)+' %':''}</div>`:'';
+  const pvTxt=pvMWh>0?`, couplée à ${pvK?fmt(pvK)+' kWc de panneaux solaires':'votre installation solaire'} (${fmt(pvMWh,0)} MWh/an)`:'';
+  let before='';
+  if(o.before){
+    const tC=(a)=>a.reduce((x,s)=>x+Math.max(0,s.netGrid)*0.25,0)/1000,tI=(a)=>a.reduce((x,s)=>x+Math.max(0,-s.netGrid)*0.25,0)/1000;
+    const sim=r.sim,pB=mPeaks(R.baseline),pA=mPeaks(sim),avg=p=>Object.values(p).reduce((a,b)=>a+b,0)/Math.max(1,Object.keys(p).length);
+    const sc=(i)=>pvMWh>0?fmt((pvMWh-i)/pvMWh*100,0)+' %':'—';
+    before=`<h2>Votre site avant et après la batterie</h2><table class="rp-tbl"><thead><tr><th></th><th>Sans batterie</th><th>Avec batterie</th></tr></thead><tbody>
+      <tr><td>Électricité prélevée sur le réseau</td><td>${fmt(tC(R.baseline),0)} MWh</td><td>${fmt(tC(sim),0)} MWh</td></tr>
+      ${pvMWh>0?`<tr><td>Électricité solaire injectée au réseau</td><td>${fmt(tI(R.baseline),0)} MWh</td><td>${fmt(tI(sim),0)} MWh</td></tr><tr><td>Part de la production solaire consommée sur place</td><td>${sc(tI(R.baseline))}</td><td>${sc(tI(sim))}</td></tr>`:''}
+      <tr><td>Pointe mensuelle moyenne</td><td>${fmt(avg(pB),0)} kW</td><td>${fmt(avg(pA),0)} kW</td></tr></tbody></table>`;
+  }
+  const p1=`<h1>Étude de rentabilité<br/>batterie de stockage</h1><div class="rp-sub">${esc(o.client)}${o.site?' · '+esc(o.site):''}</div>
+    <div class="rp-meta"><div><b>Client</b>${esc(o.client)}</div><div><b>Date</b>${esc(o.date)}</div><div><b>Site</b>${esc(o.site||'—')}</div><div><b>Préparé par</b>${esc(o.issuer)}${o.contact?'<br/>'+esc(o.contact):''}</div></div>
+    ${o.msg?`<p style="margin-top:4mm">${esc(o.msg).replace(/\n/g,'<br/>')}</p>`:''}
+    <h2>En résumé · scénario ${RP_SCEN[o.scen].toLowerCase()}</h2><div class="rp-kpis">${k}</div>
+    <p style="margin-top:4mm">Nous proposons l'installation d'une batterie de <b>${fmt(cap)} kWh / ${fmt(pow)} kW</b>${pvTxt}, pour un site consommant environ <b>${fmt(consoMWh,0)} MWh par an</b>. ${shareTxt}</p>
+    <h2>La solution proposée</h2>
+    <p>La puissance de la batterie est répartie entre votre site et les services au réseau électrique belge. Cette répartition garantit qu'aucune capacité n'est comptée deux fois.</p>
+    <div class="rp-alloc">${seg(al.sF*100,'#8BA31F','Votre site')}${seg(al.fF*100,'#0B5A8A','FCR')}${seg(al.aF*100,'#FF9D01','aFRR')}</div>
+    <ul class="rp-list"><li><b>Votre site : ${fmt(al.sitePow,0)} kW</b> pour l'autoconsommation, la réduction des pointes et l'achat d'électricité au meilleur moment.</li>
+    ${al.fF+al.aF>0?`<li><b>Services au réseau : ${fmt(pow*(al.fF+al.aF),0)} kW</b> mis à disposition d'Elia via un agrégateur (${al.fF>0?'FCR '+fmt(pow*al.fF,0)+' kW':''}${al.fF>0&&al.aF>0?', ':''}${al.aF>0?'aFRR '+fmt(pow*al.aF,0)+' kW':''}), avec une réserve d'énergie dédiée.</li>`:''}</ul>
+    ${before}`;
+  // ---- Page 2 : origine des gains ----
+  const items=RP_SRC.map(([key,l,c,d])=>[l,r[key],c,d]);
+  let t=`<table class="rp-tbl"><thead><tr><th>Source</th><th>€ / an</th></tr></thead><tbody>`;
+  items.filter(x=>x[1]>0.5).forEach(x=>{t+=`<tr><td><b>${x[0]}</b><span class="desc">${x[3]}</span></td><td>${fE(x[1],0)}</td></tr>`;});
+  t+=`<tr class="tot"><td>Total des gains bruts (année 1)</td><td>${fE(r.total,0)}</td></tr>`;
+  if(r0.agg>0.5)t+=`<tr class="neg"><td>Rémunération de l'agrégateur (services réseau)</td><td>-${fE(r0.agg,0)}</td></tr>`;
+  t+=`<tr class="neg"><td>Maintenance et logiciel de pilotage</td><td>-${fE(r0.ops,0)}</td></tr>`;
+  if(m==='tiers')t+=`<tr class="neg"><td>Financement de l'installation par ${esc(o.issuer)}</td><td>-${fE(r0.contract,0)}</td></tr><tr class="main"><td>Revenus nets à partager</td><td>${fE(r0.nets,0)}</td></tr><tr class="main"><td>Votre part (${fmt(100-f.wgiShare*100)} %)</td><td>${fE(r0.client,0)}</td></tr>`;
+  else if(m==='leasing')t+=`<tr class="main"><td>Revenus nets</td><td>${fE(r0.nets,0)}</td></tr><tr class="neg"><td>Loyer annuel</td><td>-${fE(r0.lease,0)}</td></tr><tr class="main"><td>Votre gain net</td><td>${fE(r0.client,0)}</td></tr>`;
+  else t+=`<tr class="main"><td>Votre gain net annuel</td><td>${fE(r0.client,0)}</td></tr>`;
+  t+='</tbody></table>';
+  let cmp='';
+  if(o.cmp){
+    const col=key=>{const rr=R['rev'+key],ff=R['fin'+key],q=ff.rows[0],cc=ff.rows.reduce((a,x)=>a+x.client,0);
+      return {g:rr.total,n:q.client,cum:m==='propres'?cc-ff.capex:cc,pb:ff.payback,irr:ff.irr,fcr:rr.fcr+rr.afrr,al:rr.alloc};};
+    const c={C:col('C'),B:col('B'),O:col('O')},ks=['C','B','O'];
+    const line=(l,fn)=>`<tr${l.startsWith('!')?' class="main"':''}><td>${l.replace('!','')}</td>${ks.map(x=>`<td>${fn(c[x])}</td>`).join('')}</tr>`;
+    cmp=`<h2>Trois scénarios de marché</h2><p>Les revenus des services au réseau dépendent des prix de marché, qui ont fortement varié ces dernières années. Nous présentons donc trois scénarios.</p>
+      <table class="rp-tbl"><thead><tr><th></th>${ks.map(x=>`<th>${RP_SCEN[x]}</th>`).join('')}</tr></thead><tbody>
+      ${line('Prix de référence FCR',x=>{const key={C:'cons',B:'base',O:'opti'}[ks.find(y=>c[y]===x)];return fmt(getV(key+'-fcr-price'),1)+' €/MW/h';})}
+      ${line('Gains bruts an 1',x=>fE(x.g,0))}${line('dont services réseau',x=>fE(x.fcr,0))}
+      ${line('!'+(m==='tiers'?'Votre part an 1':'Gain net an 1'),x=>fE(x.n,0))}
+      ${line('!'+(m==='propres'?'Gain net sur '+dur+' ans':'Gain cumulé sur '+dur+' ans'),x=>fE(x.cum,0))}
+      ${m==='propres'?line('Retour sur investissement',x=>x.pb?fmt(x.pb,1)+' ans':'> '+dur+' ans')+line('Rendement (TRI)',x=>x.irr?fmt(x.irr*100,1)+' %':'—'):''}
+      </tbody></table>`;
+  }
+  const p2=`<h2 style="margin-top:0">D'où viennent les gains · scénario ${RP_SCEN[o.scen].toLowerCase()}</h2>${rpBarsSVG(items)}<div style="margin-top:3mm">${t}</div>${cmp}`;
+  // ---- Page 3 : plan financier ----
+  const inv0=m==='propres'?f.capex:0;let cum=-inv0;const cumV=[cum];rows.forEach(x=>{cum+=x.client;cumV.push(cum);});
+  const fr=rows.map(x=>`<tr><td>${x.y}</td><td>${fE(x.bruts,0)}</td><td>${fE(x.agg+x.ops+(m==='tiers'?x.contract+x.partW:0)+(m==='leasing'?x.lease:0),0)}</td><td>${fE(x.client,0)}</td><td>${fE(cumV[x.y],0)}</td></tr>`).join('');
+  const p3=`<h2 style="margin-top:0">Plan financier sur ${dur} ans · scénario ${RP_SCEN[o.scen].toLowerCase()}</h2>
+    <p>${m==='propres'?`Position de trésorerie cumulée : l'investissement de ${fE(f.capex,0)} en année 0, puis les gains nets de chaque année.${f.payback?` L'investissement est remboursé après environ <b>${fmt(f.payback,1)} ans</b>.`:''}`:`Gains cumulés pour votre entreprise, sans investissement de votre part.`}</p>
+    ${rpCumSVG(cumV)}
+    <table class="rp-tbl" style="margin-top:3mm"><thead><tr><th>Année</th><th>Gains bruts</th><th>${m==='tiers'?'Frais et part '+esc(o.issuer):m==='leasing'?'Frais et loyer':'Frais et maintenance'}</th><th>${m==='propres'?'Gain net':'Votre gain'}</th><th>Cumulé</th></tr></thead><tbody>
+    ${m==='propres'?`<tr><td>0</td><td></td><td>Investissement</td><td>-${fE(f.capex,0)}</td><td>${fE(-f.capex,0)}</td></tr>`:''}${fr}
+    <tr class="tot"><td>Total</td><td>${fE(rows.reduce((a,x)=>a+x.bruts,0),0)}</td><td></td><td>${fE(clientCum,0)}</td><td>${fE(cumV[cumV.length-1],0)}</td></tr></tbody></table>
+    <p class="rp-note">Montants hors TVA, indexés de ${fmt(getV('fin-inflation'),1)} % par an.</p>`;
+  // ---- Page 4 : hypothèses ----
+  const refSel=el({C:'cons',B:'base',O:'opti'}[o.scen]+'-ref-year');
+  const priceTxt={tou:`tarif heures pleines / creuses (${fmt(getV('p-offtake-hp'))} / ${fmt(getV('p-offtake-hc'))} €/MWh tout compris)`,flat:`tarif unique de ${fmt(getV('p-flat'))} €/MWh`,
+    spot:'prix de marché au quart d\'heure (EPEX Belgique) majorés des frais de réseau et taxes',
+    index:`formule indexée du contrat actuel (HP ${fmt(getV('p-idx-a-hp'),2)} + ${fmt(getV('p-idx-b-hp'),3)} × index, HC ${fmt(getV('p-idx-a-hc'),2)} + ${fmt(getV('p-idx-b-hc'),3)} × index ; index ${fmt(getV('p-idx-value'),2)} €/MWh), plus réseau et taxes (${fmt(getV('p-idx-reseau')+getV('p-idx-autres'),0)} €/MWh)`}[S.priceType];
+  const p4=`<h2 style="margin-top:0">Hypothèses de l'étude</h2><ul class="rp-list">
+    <li><b>Consommation</b> : ${esc(S.consoSource||'données quart-horaires mesurées')}, soit ${fmt(consoMWh,0)} MWh/an, simulée au pas de 15 minutes sur une année complète.</li>
+    ${pvMWh>0?`<li><b>Production solaire</b> : ${pvK?fmt(pvK)+' kWc, ':''}${fmt(pvMWh,0)} MWh/an (${S.pvMode==='simulate'?(S.pvMethod==='ratio'?'ratio de '+fmt(getV('pv-ratio'))+' kWh/kWc':'profil météo typique de '+esc(S.selectedCity)):'données fournies'}).</li>`:''}
+    <li><b>Prix de l'électricité</b> : ${priceTxt}. Tarifs de pointe du réseau : ${fmt(getV('p-monthly-peak'),2)} €/kW/mois et ${fmt(getV('p-yearly-peak'),2)} €/kW/an.</li>
+    <li><b>Batterie</b> : ${fmt(cap)} kWh / ${fmt(pow)} kW, rendement ${fmt(getV('batt-eff'))} %, plage de charge ${fmt(getV('batt-soc-min'))} à ${fmt(getV('batt-soc-max'))} %, au plus ${fmt(getV('max-cycles'),1)} cycle par jour.</li>
+    ${al.fF+al.aF>0?`<li><b>Services au réseau</b> : prix de référence ${esc(refSel?refSel.options[refSel.selectedIndex].text.toLowerCase():'')} (FCR ${fmt(getV({C:'cons',B:'base',O:'opti'}[o.scen]+'-fcr-price'),2)} €/MW/h, aFRR ${fmt(getV({C:'cons',B:'base',O:'opti'}[o.scen]+'-afrr-price'),2)} €/MW/h), disponibilité ${fmt(getV({C:'cons',B:'base',O:'opti'}[o.scen]+'-fcr-avail'))} %, rémunération de l'agrégateur déduite.</li>`:''}
+    <li><b>Exploitation</b> : maintenance et logiciel de pilotage ${fE(getV('fin-opex')+getV('fin-ems'),0)} par an ; indexation de ${fmt(getV('fin-inflation'),1)} % par an ; durée d'analyse ${dur} ans.</li>
+    ${m==='propres'?`<li><b>Investissement</b> : ${fE(f.capex,0)} HTVA (batterie, installation, provision de recyclage${getV('fin-capex-subsidy')>0?', subside de '+fE(getV('fin-capex-subsidy'),0)+' déduit':''}).</li>`:''}
+  </ul>
+  <h2>Points d'attention</h2><ul class="rp-list">
+    <li>Les revenus des services au réseau (FCR, aFRR) dépendent des prix de marché et ne sont pas garantis. Ils ont varié du simple au double entre 2021 et 2025.</li>
+    <li>La capacité de la batterie est supposée constante sur la durée de l'étude ; la perte de capacité liée au vieillissement n'est pas déduite.</li>
+    <li>Le profil de consommation ${S.consoSource&&/facture|Profil/.test(S.consoSource)?'a été reconstitué à partir de vos factures et d\'un profil type ; des mesures quart-horaires permettraient d\'affiner l\'étude':'est celui de l\'année de mesure fournie'}.</li>
+    <li>Cette étude est indicative et ne constitue pas une offre contractuelle. Les montants sont exprimés hors TVA.</li></ul>
+  <div class="rp-sign"><div><b>${esc(o.issuer)}</b>${o.contact?'<br/>'+esc(o.contact):''}</div><div style="text-align:right;color:#6b6b67">${esc(o.date)}</div></div>`;
+  const pages=[['Synthèse',p1],['Économies et revenus',p2],['Plan financier',p3],['Hypothèses',p4]];
+  return pages.map((p,i)=>rpPage(i+1,pages.length,o,p[0],p[1])).join('');
+}
+async function downloadReportPDF(){
+  const o=rpOpts(),st=el('rp-status');
+  const name=`Etude BESS - ${o.client.replace(/[\\/:*?"<>|]/g,'')}.pdf`;
+  if(typeof html2pdf==='undefined'){st.textContent='Module PDF indisponible (hors ligne) : utilisez « Imprimer / PDF vectoriel ».';return;}
+  st.textContent='⏳ Génération du PDF...';
+  // Le conteneur externe est hors écran ; html2pdf clone l'élément interne (sans positionnement) pour le rendu.
+  const wrap=document.createElement('div');wrap.style.cssText='position:fixed;left:-10000px;top:0';
+  const host=document.createElement('div');host.className='rp-doc';host.style.cssText='width:210mm;background:#fff';wrap.appendChild(host);
+  host.innerHTML=buildReportHTML().replace(/<\/div>\s*<div class="rp-page">/g,'</div><div class="html2pdf__page-break"></div><div class="rp-page">');
+  host.querySelectorAll('.rp-page').forEach(p=>{p.style.margin='0';p.style.boxShadow='none';});
+  document.body.appendChild(wrap);
+  try{
+    await html2pdf().set({margin:0,filename:name,image:{type:'jpeg',quality:0.96},html2canvas:{scale:2.2,useCORS:true,backgroundColor:'#ffffff'},
+      jsPDF:{unit:'mm',format:'a4',orientation:'portrait'},pagebreak:{mode:['css']}}).from(host).save();
+    st.textContent='✓ PDF téléchargé';
+  }catch(e){st.textContent='Erreur : '+e.message;}
+  wrap.remove();
+}
+function printReport(){
+  const root=el('print-root');root.innerHTML=buildReportHTML();
+  document.body.classList.add('rp-printing');
+  const done=()=>{document.body.classList.remove('rp-printing');root.innerHTML='';window.removeEventListener('afterprint',done);};
+  window.addEventListener('afterprint',done);
+  window.print();
+}
 
 // Init
 updateCapex();updateBadge();
