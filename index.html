@@ -162,6 +162,9 @@ select:focus{border-color:var(--wg-green)}
 .scen-pill.active.opti{background:var(--green);border-color:var(--green);color:#fff}
 .scen-panel{display:none}.scen-panel.active{display:block}
 
+/* ALLOCATION BAR */
+.alloc-bar{display:flex;height:22px;border-radius:6px;overflow:hidden;margin-top:6px;border:1px solid var(--g200);font-size:.66rem;font-weight:700;font-family:'Montserrat',sans-serif}
+.alloc-bar div{display:flex;align-items:center;justify-content:center;white-space:nowrap;overflow:hidden;color:#fff}
 /* FCR HISTORY TABLE */
 .fcr-hist{width:100%;border-collapse:collapse;font-size:.7rem;margin-top:5px}
 .fcr-hist th{background:var(--wg-green-l);padding:4px 7px;text-align:center;color:var(--wg-gray-d);font-weight:700;font-size:.63rem;font-family:'Montserrat',sans-serif;border-bottom:2px solid var(--wg-green-m)}
@@ -705,6 +708,8 @@ footer strong{color:var(--wg-green-d)}
           <div class="f"><label>Seuil peak shaving <span class="h">(% du pic historique max)</span></label>
             <div class="ir"><input type="number" id="peak-thr-pct" value="80" min="30" max="100" step="1"/><div class="iu">%</div></div>
           </div>
+          <div class="f"><label>Réserve d'énergie FCR / aFRR <span class="h">(durée à pleine puissance réservée, dans chaque sens)</span></label><div class="ir"><input type="number" id="res-dur" value="0.25" min="0" max="2" step="0.05"/><div class="iu">h</div></div></div>
+          <div class="f"><label>Cycles maximum par jour <span class="h">(garantie constructeur, tous usages confondus)</span></label><div class="ir"><input type="number" id="max-cycles" value="1.5" min="0.1" max="4" step="0.1"/><div class="iu">cycles/jour</div></div></div>
           <div class="f"><label>Limite raccordement réseau</label><div class="ir"><input type="number" id="site-grid-limit" value="172.5" min="10" max="5000" step="0.5"/><div class="iu">kW</div></div></div>
           <div class="ib" style="margin-top:8px">Mode combiné : 1. Absorber surplus PV → 2. Peak shaving → 3. Arbitrage (spot si dispo, sinon TOU)</div>
         </div>
@@ -744,9 +749,12 @@ footer strong{color:var(--wg-green-d)}
     <div class="ch"><div class="ico">ℹ️</div><h2>Logique des scénarios</h2></div>
     <div class="cb">
       <div class="ib">
-        <strong>Autoconsommation & Peak shaving</strong> : calculés par simulation réelle sur profils quart-horaires.<br/>
-        <strong>Arbitrage</strong> : calculé via les prix spot (si fournis) ou TOU jour/nuit.<br/>
-        <strong>FCR / aFRR / Imbalance</strong> : estimés (P_réservée × prix marché × disponibilité). Prix historiques belges modifiables par scénario — <strong>les revenus ont fluctué de 19 à 44 €/MW/h pour le FCR</strong>, ce qui explique les écarts importants entre scénarios.
+        <strong>Règles de cumul des revenus</strong> (appliquées automatiquement à chaque scénario) :<br/>
+        1. <strong>Puissance</strong> : FCR % + aFRR % + site % = 100 %. Augmenter un service réservé réduit l'autre ; le site reçoit le reste.<br/>
+        2. <strong>Énergie</strong> : chaque kW réservé FCR/aFRR bloque une réserve de charge (durée réglable dans Batterie & Site). Le site ne travaille que dans la plage restante. Si la réserve est impossible, l'offre FCR/aFRR est réduite.<br/>
+        3. <strong>Autoconsommation + pointe</strong> : cumulables (une même décharge évite des kWh et réduit la pointe), simulées au quart d'heure sur la seule puissance site.<br/>
+        4. <strong>Arbitrage et imbalance</strong> : même flexibilité, non cumulables. Un seul est retenu (le meilleur, ou celui imposé). L'arbitrage n'utilise que les cycles restant sous le plafond journalier ; l'imbalance, que le temps où la batterie est libre.<br/>
+        5. <strong>Commissions</strong> : chaque service de marché (FCR, aFRR, imbalance) porte sa commission ; autoconsommation, pointe et arbitrage sont des économies sur la facture du client, sans commission.
       </div>
     </div>
   </div>
@@ -771,13 +779,30 @@ footer strong{color:var(--wg-green-d)}
         </div>
       </div>
     </div>
+    <div class="card">
+      <div class="ch"><div class="ico">🔋</div><h2>Allocation de la batterie — Conservateur</h2><div class="sub">Total toujours = 100 %</div></div>
+      <div class="cb">
+        <div class="g3">
+          <div class="f"><label>Puissance réservée FCR</label><div class="ir"><input type="number" id="cons-fcr-frac" class="alloc-in" data-scen="cons" value="30" min="0" max="100" step="5"/><div class="iu">%</div></div></div>
+          <div class="f"><label>Puissance réservée aFRR</label><div class="ir"><input type="number" id="cons-afrr-frac" class="alloc-in" data-scen="cons" value="0" min="0" max="100" step="5"/><div class="iu">%</div></div></div>
+          <div class="f"><label>Puissance site <span class="h">(autoconso, pointe, arbitrage ou imbalance)</span></label><div class="ir"><input type="number" id="cons-site-frac" value="70" disabled/><div class="iu">%</div></div></div>
+        </div>
+        <div class="alloc-bar" id="cons-alloc-bar"></div>
+        <div class="f" style="margin-top:8px"><label>Capacité libre du site valorisée en <span class="h">(arbitrage et imbalance utilisent la même flexibilité : non cumulables)</span></label>
+          <select id="cons-mkt-mode">
+            <option value="best" selected>Le meilleur des deux (un seul retenu)</option>
+            <option value="arb">Arbitrage uniquement</option>
+            <option value="imbal">Imbalance uniquement</option>
+          </select></div>
+        <div class="ib" id="cons-alloc-info" style="font-size:.7rem">—</div>
+      </div>
+    </div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
       <div>
         <div class="card">
           <div class="ch"><div class="ico">🔄</div><h2>FCR — Conservateur <span style="font-size:.7rem;color:var(--g400);font-weight:400">(prix 2025 : 19.67 €/MW/h)</span></h2></div>
           <div class="cb">
             <div class="g2">
-              <div class="f"><label>% Batterie réservé FCR</label><div class="ir"><input type="number" id="cons-fcr-frac" value="30" min="0" max="100" step="5"/><div class="iu">%</div></div></div>
               <div class="f"><label>Disponibilité</label><div class="ir"><input type="number" id="cons-fcr-avail" value="90" min="0" max="100" step="1"/><div class="iu">%</div></div></div>
               <div class="f"><label>Prix FCR retenu</label><div class="ir"><input type="number" id="cons-fcr-price" value="19.67" min="0" max="200" step="0.01"/><div class="iu">€/MW/h</div></div></div>
               <div class="f"><label>Commission agrégateur</label><div class="ir"><input type="number" id="cons-fcr-agg" value="38" min="0" max="60" step="1"/><div class="iu">%</div></div></div>
@@ -796,7 +821,6 @@ footer strong{color:var(--wg-green-d)}
           <div class="ch"><div class="ico">⚡</div><h2>aFRR — Conservateur</h2></div>
           <div class="cb">
             <div class="g2">
-              <div class="f"><label>% Batterie réservé aFRR</label><div class="ir"><input type="number" id="cons-afrr-frac" value="0" min="0" max="100" step="5"/><div class="iu">%</div></div></div>
               <div class="f"><label>Disponibilité</label><div class="ir"><input type="number" id="cons-afrr-avail" value="85" min="0" max="100" step="1"/><div class="iu">%</div></div></div>
               <div class="f"><label>Prix aFRR retenu</label><div class="ir"><input type="number" id="cons-afrr-price" value="6" min="0" max="200" step="0.5"/><div class="iu">€/MW/h</div></div></div>
               <div class="f"><label>Commission agrégateur</label><div class="ir"><input type="number" id="cons-afrr-agg" value="38" min="0" max="60" step="1"/><div class="iu">%</div></div></div>
@@ -826,6 +850,7 @@ footer strong{color:var(--wg-green-d)}
           <div class="ch"><div class="ico">📊</div><h2>Imbalance — Conservateur</h2></div>
           <div class="cb">
             <div class="f"><label>Revenus imbalance</label><div class="ir"><input type="number" id="cons-imbal" value="0" min="0" max="200" step="1"/><div class="iu">€/kWh capacité/an</div></div></div>
+            <div class="f"><label>Commission agrégateur imbalance</label><div class="ir"><input type="number" id="cons-imbal-agg" value="30" min="0" max="60" step="1"/><div class="iu">%</div></div></div>
             <div class="ib warn">Désactivé en scénario conservateur — marché très volatile.</div>
           </div>
         </div>
@@ -848,13 +873,30 @@ footer strong{color:var(--wg-green-d)}
         </div>
       </div>
     </div>
+    <div class="card">
+      <div class="ch"><div class="ico">🔋</div><h2>Allocation de la batterie — Base</h2><div class="sub">Total toujours = 100 %</div></div>
+      <div class="cb">
+        <div class="g3">
+          <div class="f"><label>Puissance réservée FCR</label><div class="ir"><input type="number" id="base-fcr-frac" class="alloc-in" data-scen="base" value="40" min="0" max="100" step="5"/><div class="iu">%</div></div></div>
+          <div class="f"><label>Puissance réservée aFRR</label><div class="ir"><input type="number" id="base-afrr-frac" class="alloc-in" data-scen="base" value="10" min="0" max="100" step="5"/><div class="iu">%</div></div></div>
+          <div class="f"><label>Puissance site <span class="h">(autoconso, pointe, arbitrage ou imbalance)</span></label><div class="ir"><input type="number" id="base-site-frac" value="50" disabled/><div class="iu">%</div></div></div>
+        </div>
+        <div class="alloc-bar" id="base-alloc-bar"></div>
+        <div class="f" style="margin-top:8px"><label>Capacité libre du site valorisée en <span class="h">(arbitrage et imbalance utilisent la même flexibilité : non cumulables)</span></label>
+          <select id="base-mkt-mode">
+            <option value="best" selected>Le meilleur des deux (un seul retenu)</option>
+            <option value="arb">Arbitrage uniquement</option>
+            <option value="imbal">Imbalance uniquement</option>
+          </select></div>
+        <div class="ib" id="base-alloc-info" style="font-size:.7rem">—</div>
+      </div>
+    </div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
       <div>
         <div class="card">
           <div class="ch"><div class="ico">🔄</div><h2>FCR — Base <span style="font-size:.7rem;color:var(--g400);font-weight:400">(moyenne 2021-2024 : ~34 €/MW/h)</span></h2></div>
           <div class="cb">
             <div class="g2">
-              <div class="f"><label>% Batterie réservé FCR</label><div class="ir"><input type="number" id="base-fcr-frac" value="40" min="0" max="100" step="5"/><div class="iu">%</div></div></div>
               <div class="f"><label>Disponibilité</label><div class="ir"><input type="number" id="base-fcr-avail" value="93" min="0" max="100" step="1"/><div class="iu">%</div></div></div>
               <div class="f"><label>Prix FCR retenu</label><div class="ir"><input type="number" id="base-fcr-price" value="30" min="0" max="200" step="0.5"/><div class="iu">€/MW/h</div></div></div>
               <div class="f"><label>Commission agrégateur</label><div class="ir"><input type="number" id="base-fcr-agg" value="38" min="0" max="60" step="1"/><div class="iu">%</div></div></div>
@@ -865,7 +907,6 @@ footer strong{color:var(--wg-green-d)}
           <div class="ch"><div class="ico">⚡</div><h2>aFRR — Base</h2></div>
           <div class="cb">
             <div class="g2">
-              <div class="f"><label>% Batterie réservé aFRR</label><div class="ir"><input type="number" id="base-afrr-frac" value="10" min="0" max="100" step="5"/><div class="iu">%</div></div></div>
               <div class="f"><label>Disponibilité</label><div class="ir"><input type="number" id="base-afrr-avail" value="88" min="0" max="100" step="1"/><div class="iu">%</div></div></div>
               <div class="f"><label>Prix aFRR retenu</label><div class="ir"><input type="number" id="base-afrr-price" value="12" min="0" max="200" step="0.5"/><div class="iu">€/MW/h</div></div></div>
               <div class="f"><label>Commission agrégateur</label><div class="ir"><input type="number" id="base-afrr-agg" value="35" min="0" max="60" step="1"/><div class="iu">%</div></div></div>
@@ -892,6 +933,7 @@ footer strong{color:var(--wg-green-d)}
           <div class="ch"><div class="ico">📊</div><h2>Imbalance — Base</h2></div>
           <div class="cb">
             <div class="f"><label>Revenus imbalance</label><div class="ir"><input type="number" id="base-imbal" value="5" min="0" max="200" step="1"/><div class="iu">€/kWh/an</div></div></div>
+            <div class="f"><label>Commission agrégateur imbalance</label><div class="ir"><input type="number" id="base-imbal-agg" value="30" min="0" max="60" step="1"/><div class="iu">%</div></div></div>
           </div>
         </div>
       </div>
@@ -913,13 +955,30 @@ footer strong{color:var(--wg-green-d)}
         </div>
       </div>
     </div>
+    <div class="card">
+      <div class="ch"><div class="ico">🔋</div><h2>Allocation de la batterie — Optimiste</h2><div class="sub">Total toujours = 100 %</div></div>
+      <div class="cb">
+        <div class="g3">
+          <div class="f"><label>Puissance réservée FCR</label><div class="ir"><input type="number" id="opti-fcr-frac" class="alloc-in" data-scen="opti" value="50" min="0" max="100" step="5"/><div class="iu">%</div></div></div>
+          <div class="f"><label>Puissance réservée aFRR</label><div class="ir"><input type="number" id="opti-afrr-frac" class="alloc-in" data-scen="opti" value="15" min="0" max="100" step="5"/><div class="iu">%</div></div></div>
+          <div class="f"><label>Puissance site <span class="h">(autoconso, pointe, arbitrage ou imbalance)</span></label><div class="ir"><input type="number" id="opti-site-frac" value="35" disabled/><div class="iu">%</div></div></div>
+        </div>
+        <div class="alloc-bar" id="opti-alloc-bar"></div>
+        <div class="f" style="margin-top:8px"><label>Capacité libre du site valorisée en <span class="h">(arbitrage et imbalance utilisent la même flexibilité : non cumulables)</span></label>
+          <select id="opti-mkt-mode">
+            <option value="best" selected>Le meilleur des deux (un seul retenu)</option>
+            <option value="arb">Arbitrage uniquement</option>
+            <option value="imbal">Imbalance uniquement</option>
+          </select></div>
+        <div class="ib" id="opti-alloc-info" style="font-size:.7rem">—</div>
+      </div>
+    </div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
       <div>
         <div class="card">
           <div class="ch"><div class="ico">🔄</div><h2>FCR — Optimiste <span style="font-size:.7rem;color:var(--g400);font-weight:400">(prix 2024 : 43.73 €/MW/h)</span></h2></div>
           <div class="cb">
             <div class="g2">
-              <div class="f"><label>% Batterie réservé FCR</label><div class="ir"><input type="number" id="opti-fcr-frac" value="50" min="0" max="100" step="5"/><div class="iu">%</div></div></div>
               <div class="f"><label>Disponibilité</label><div class="ir"><input type="number" id="opti-fcr-avail" value="96" min="0" max="100" step="1"/><div class="iu">%</div></div></div>
               <div class="f"><label>Prix FCR retenu</label><div class="ir"><input type="number" id="opti-fcr-price" value="43.73" min="0" max="200" step="0.01"/><div class="iu">€/MW/h</div></div></div>
               <div class="f"><label>Commission agrégateur</label><div class="ir"><input type="number" id="opti-fcr-agg" value="35" min="0" max="60" step="1"/><div class="iu">%</div></div></div>
@@ -930,7 +989,6 @@ footer strong{color:var(--wg-green-d)}
           <div class="ch"><div class="ico">⚡</div><h2>aFRR — Optimiste</h2></div>
           <div class="cb">
             <div class="g2">
-              <div class="f"><label>% Batterie réservé aFRR</label><div class="ir"><input type="number" id="opti-afrr-frac" value="15" min="0" max="100" step="5"/><div class="iu">%</div></div></div>
               <div class="f"><label>Disponibilité</label><div class="ir"><input type="number" id="opti-afrr-avail" value="92" min="0" max="100" step="1"/><div class="iu">%</div></div></div>
               <div class="f"><label>Prix aFRR retenu</label><div class="ir"><input type="number" id="opti-afrr-price" value="18" min="0" max="200" step="0.5"/><div class="iu">€/MW/h</div></div></div>
               <div class="f"><label>Commission agrégateur</label><div class="ir"><input type="number" id="opti-afrr-agg" value="30" min="0" max="60" step="1"/><div class="iu">%</div></div></div>
@@ -957,6 +1015,7 @@ footer strong{color:var(--wg-green-d)}
           <div class="ch"><div class="ico">📊</div><h2>Imbalance — Optimiste</h2></div>
           <div class="cb">
             <div class="f"><label>Revenus imbalance</label><div class="ir"><input type="number" id="opti-imbal" value="15" min="0" max="200" step="1"/><div class="iu">€/kWh/an</div></div></div>
+            <div class="f"><label>Commission agrégateur imbalance</label><div class="ir"><input type="number" id="opti-imbal-agg" value="30" min="0" max="60" step="1"/><div class="iu">%</div></div></div>
           </div>
         </div>
       </div>
@@ -971,7 +1030,7 @@ footer strong{color:var(--wg-green-d)}
     <div class="cb">
       <div class="model-sel">
         <button class="msb active" data-model="tiers"><div class="msb-icon">🤝</div><div class="msb-title">Tiers-Investissement</div><div class="msb-sub">WGI finance, revenus partagés après déductions</div></button>
-        <button class="msb" data-model="propres"><div class="msb-icon">🏢</div><div class="msb-title">Fonds Propres Client</div><div class="msb-sub">Client finance, tous les revenus nets lui reviennent</div></button>
+        <button class="msb" data-model="propres"><div class="msb-icon">🏢</div><div class="msb-title">Vente au client (fonds propres)</div><div class="msb-sub">Le client achète la BESS et conserve tous les revenus. WGI n'intervient pas.</div></button>
         <button class="msb" data-model="leasing"><div class="msb-icon">📋</div><div class="msb-title">Leasing</div><div class="msb-sub">Client paie un loyer fixe à WGI</div></button>
       </div>
     </div>
@@ -1098,7 +1157,7 @@ footer strong{color:var(--wg-green-d)}
 </div>
 
 </main>
-<footer>We Green Invest · Simulateur BESS v2.1 · PV simulé sur profil météo typique belge · Dispatch sur données réelles · Confidentiel</footer>
+<footer>We Green Invest · Simulateur BESS v2.2 · PV simulé sur profil météo typique belge · Dispatch sur données réelles · Confidentiel</footer>
 
 <script>
 // ═══════════════════════════════ STATE ═══════════════════════════════
@@ -1651,11 +1710,12 @@ function updateRecap(){
 
 // ═══════════════════════ HELPERS FINANCIERS ═══════════════════════
 function pmt(r,n,pv){return r===0?pv/n:pv*r*Math.pow(1+r,n)/(Math.pow(1+r,n)-1);}
+// TRI par dichotomie : VAN(r) décroît avec r. Recherche entre -99 % et 1000 %.
 function irrCalc(equity,cfs){
-  const f=r=>{let s=-equity;cfs.forEach((c,i)=>s+=c/Math.pow(1+r,i+1));return s;};
-  if(f(50)<=0)return null;
-  let lo=-0.99,hi=50;
-  for(let i=0;i<300;i++){const m=(lo+hi)/2;f(m)>0?hi=m:lo=m;if(hi-lo<1e-8)break;}
+  const f=r=>{let v=-equity;cfs.forEach((c,i)=>v+=c/Math.pow(1+r,i+1));return v;};
+  let lo=-0.99,hi=10;
+  if(f(lo)<0||f(hi)>0)return null; // pas de changement de signe : TRI non défini
+  for(let i=0;i<200;i++){const m=(lo+hi)/2;if(f(m)>0)lo=m;else hi=m;if(hi-lo<1e-7)break;}
   return (lo+hi)/2;
 }
 function isHP(h,dow){
@@ -1747,11 +1807,31 @@ function mergeData(){
   return merged;
 }
 
+// ═══════════════════════ ALLOCATION DE LA BATTERIE ═══════════════════════
+// Règle 1 (puissance) : FCR % + aFRR % + site % = 100 %. Le site (autoconso, pointe, arbitrage/imbalance)
+//   ne dispose que de la puissance non réservée.
+// Règle 2 (énergie) : chaque kW réservé en FCR/aFRR doit pouvoir être tenu res-dur heures dans les deux sens.
+//   Cette énergie est retirée en haut ET en bas de la plage SoC utilisable par le site.
+// Si la réserve dépasse la plage disponible, l'offre FCR/aFRR est réduite au prorata (feasibility < 1).
+function allocation(k,cfg){
+  const cap=cfg.cap,pow=cfg.pow;
+  const fF=Math.max(0,getV(k+'-fcr-frac'))/100,aF=Math.max(0,getV(k+'-afrr-frac'))/100;
+  const sF=Math.max(0,1-fF-aF);
+  const dur=Math.max(0,getV('res-dur'));
+  const eRes=(fF+aF)*pow*dur;              // kWh réservés dans chaque sens
+  const band=cap*(cfg.socMax-cfg.socMin);   // kWh utiles nominaux
+  const feasibility=eRes>0?Math.min(1,band/(2*eRes)):1;
+  let lo=cfg.socMin+eRes/cap,hi=cfg.socMax-eRes/cap;
+  if(lo>hi){lo=hi=(cfg.socMin+cfg.socMax)/2;}
+  return {fF,aF,sF,sitePow:pow*sF,eRes,socLo:lo,socHi:hi,usable:cap*(hi-lo),band,feasibility};
+}
+
 function runDispatch(data,battCfg,scenKey,noArb){
-  const {cap,pow,effRT,socMin,socMax}=battCfg;
-  const fcrFrac=(getV(scenKey+'-fcr-frac')||0)/100;
+  const {cap,effRT}=battCfg;
+  const al=allocation(scenKey,battCfg);
+  const socMin=al.socLo,socMax=al.socHi;    // plage SoC laissée au site après réserve FCR/aFRR
   const dt=0.25,effC=Math.sqrt(effRT),effD=Math.sqrt(effRT);
-  const dispPow=pow*(1-fcrFrac);
+  const dispPow=al.sitePow;                  // puissance non réservée
   const peakThrPct=(parseFloat(el('peak-thr-pct').value)||80)/100;
   const strategy=el('dispatch-strategy').value;
   const gridLimit=parseFloat(el('site-grid-limit').value)||172.5;
@@ -1764,7 +1844,7 @@ function runDispatch(data,battCfg,scenKey,noArb){
     dayThresh.push({lo:ps[Math.floor(ps.length*0.25)]||0,hi:ps[Math.floor(ps.length*0.75)]||9999});
   }
 
-  let soc=cap*0.5;
+  let soc=cap*(socMin+socMax)/2;
   const peakMax=Math.max(...data.map(s=>Math.max(0,s.cons-s.pv)));
   const peakTarget=peakMax*peakThrPct;
   const res=[];
@@ -1814,42 +1894,71 @@ function energySavings(baseline,sim){
 // simNoArb : même dispatch sans l'étape arbitrage. Quand le prix varie dans la journée (spot 15 min),
 // l'effet de l'arbitrage est déjà contenu dans la facture simulée : on l'isole par différence
 // (économie totale - économie sans arbitrage) au lieu de l'ajouter une seconde fois.
-function calcRevenues(baseline,simFull,scenKey,simNoArb){
-  const dt=0.25;
-  const arbMode=el(scenKey+'-arb-mode')?.value||'auto';
-  const useDiff=S.varPrice&&arbMode==='auto'&&simNoArb;
-  const sim=(S.varPrice&&arbMode!=='auto'&&simNoArb)?simNoArb:simFull;
-  let autoSav,arb=0;
-  if(useDiff){
-    autoSav=energySavings(baseline,simNoArb);
-    arb=energySavings(baseline,simFull)-autoSav;
-  } else {
-    autoSav=energySavings(baseline,sim);
-    if(arbMode!=='disabled'){
-      const spread=getV(scenKey+'-arb-spread')||0;
-      const cycles=getV(scenKey+'-arb-cycles')||0;
-      const cap=parseFloat(el('batt-cap').value)||215;
-      const eff=(parseFloat(el('batt-eff').value)||92)/100;
-      arb=spread/1000*cap*eff*cycles*365;
+// Règles de cumul appliquées :
+//  - Autoconsommation + peak shaving : cumulables (une même décharge évite des kWh ET réduit la pointe,
+//    deux composantes distinctes de la facture). Simulés ensemble, sur la puissance site uniquement.
+//  - Arbitrage et imbalance : utilisent la même flexibilité libre du site, non cumulables.
+//    Selon {k}-mkt-mode : le meilleur des deux (net de commission), ou l'un imposé.
+//  - Arbitrage : seulement sur les cycles restant après autoconso/pointe (plafond cycles/jour),
+//    sur l'énergie utile du site (après réserve FCR/aFRR).
+//  - Imbalance : forfait x capacité x part site x part du temps où la batterie est libre.
+//  - FCR / aFRR : puissance réservée x prix x disponibilité x faisabilité énergétique.
+//  - Commissions agrégateur : chaque source avec sa propre commission, par scénario.
+//    Autoconso, pointe et arbitrage sont des économies sur la facture du client : pas de commission.
+function cyclesPerDay(sim,cap){
+  const dis=sim.reduce((a,s)=>a+Math.max(0,-s.bAC)*0.25,0);
+  return dis/cap/(sim.length/96);
+}
+function calcRevenues(baseline,simFull,scenKey,simNoArb,battCfg){
+  const k=scenKey,cap=battCfg.cap,pow=battCfg.pow,eff=battCfg.effRT;
+  const al=allocation(k,battCfg);
+  const maxC=getV('max-cycles')||1.5;
+  const arbMode=el(k+'-arb-mode')?.value||'auto';
+  const mkt=el(k+'-mkt-mode')?.value||'best';
+  const notes=[];
+  const na=simNoArb||simFull;
+  const cycNoArb=cyclesPerDay(na,cap);
+  const idleShare=na.filter(s=>Math.abs(s.bAC)<0.01).length/na.length;
+
+  // 1) Arbitrage potentiel
+  let arb=0,arbUsesDispatch=false;
+  if(arbMode!=='disabled'&&al.sitePow>0){
+    if(S.varPrice&&arbMode==='auto'){
+      arbUsesDispatch=true;
+      arb=energySavings(baseline,simFull)-energySavings(baseline,na);
+      const cycFull=cyclesPerDay(simFull,cap);
+      if(cycFull>maxC&&cycFull>cycNoArb){const r=Math.max(0,(maxC-cycNoArb)/(cycFull-cycNoArb));arb*=r;notes.push(`Arbitrage réduit à ${fmt(r*100,0)} % (plafond ${maxC} cycles/jour)`);}
+    } else {
+      const spread=getV(k+'-arb-spread'),want=getV(k+'-arb-cycles');
+      const avail=Math.max(0,maxC-cycNoArb),cyc=Math.min(want,avail);
+      if(cyc<want)notes.push(`Arbitrage limité à ${fmt(cyc,2)} cycle/jour (autoconso/pointe en utilisent ${fmt(cycNoArb,2)}, plafond ${maxC})`);
+      arb=spread/1000*al.usable*eff*cyc*365;
     }
   }
-  // Peak shaving
+  // 2) Imbalance potentiel (sur le temps libre du site)
+  const imbAgg=getV(k+'-imbal-agg')/100;
+  let imbal=getV(k+'-imbal')*cap*al.sF*idleShare;
+  // 3) Non-cumul arbitrage / imbalance
+  let pick=mkt;
+  if(mkt==='best')pick=(imbal*(1-imbAgg)>arb)?'imbal':'arb';
+  if(pick==='arb'){if(imbal>0&&mkt==='best')notes.push(`Imbalance non cumulé (${fE(imbal*(1-imbAgg),0)} net < arbitrage)`);imbal=0;}
+  else {if(arb>0&&mkt==='best')notes.push(`Arbitrage non cumulé (${fE(arb,0)} < imbalance net)`);arb=0;arbUsesDispatch=false;}
+  // 4) Autoconsommation + pointe (dispatch sans arbitrage si l'arbitrage n'est pas retenu)
+  const sim=arbUsesDispatch?simFull:na;
+  const autoSav=energySavings(baseline,na);
   const mPB=mPeaks(baseline),mPA=mPeaks(sim);
   let peakSav=0;
   for(let m=0;m<12;m++)peakSav+=Math.max(0,(mPB[m]||0)-(mPA[m]||0))*(parseFloat(el('p-monthly-peak').value)||6.76);
   peakSav+=Math.max(0,Math.max(...Object.values(mPB))-Math.max(...Object.values(mPA)))*(parseFloat(el('p-yearly-peak').value)||40.54);
-  // FCR
-  const pow=parseFloat(el('batt-pow').value)||100;
-  const fcrF=(getV(scenKey+'-fcr-frac')||0)/100,fcrA=(getV(scenKey+'-fcr-avail')||0)/100,fcrP=getV(scenKey+'-fcr-price')||0;
-  const fcr=pow*fcrF*fcrP*8760*fcrA/1000;
-  // aFRR
-  const afrF=(getV(scenKey+'-afrr-frac')||0)/100,afrA=(getV(scenKey+'-afrr-avail')||0)/100,afrP=getV(scenKey+'-afrr-price')||0;
-  const afrr=pow*afrF*afrP*8760*afrA/1000;
-  // Imbalance
-  const capKwh=parseFloat(el('batt-cap').value)||215;
-  const imbal=(getV(scenKey+'-imbal')||0)*capKwh;
-
-  return {autoconso:Math.max(0,autoSav),peak:Math.max(0,peakSav),arb:Math.max(0,arb),fcr,afrr,imbal,total:Math.max(0,autoSav)+Math.max(0,peakSav)+Math.max(0,arb)+fcr+afrr+imbal};
+  // 5) FCR / aFRR
+  if(al.feasibility<1)notes.push(`Réserve FCR/aFRR trop grande pour l'énergie de la batterie : offre réduite à ${fmt(al.feasibility*100,0)} %`);
+  const fcr=pow*al.fF*getV(k+'-fcr-price')*8760*(getV(k+'-fcr-avail')/100)/1000*al.feasibility;
+  const afrr=pow*al.aF*getV(k+'-afrr-price')*8760*(getV(k+'-afrr-avail')/100)/1000*al.feasibility;
+  // 6) Commissions agrégateur, par source
+  const aggFees=fcr*getV(k+'-fcr-agg')/100+afrr*getV(k+'-afrr-agg')/100+imbal*imbAgg;
+  const A=Math.max(0,autoSav),P=Math.max(0,peakSav),R=Math.max(0,arb);
+  return {autoconso:A,peak:P,arb:R,fcr,afrr,imbal,total:A+P+R+fcr+afrr+imbal,aggFees,
+    alloc:al,notes,cycles:cyclesPerDay(sim,cap),pick,sim};
 }
 
 function mPeaks(slots){
@@ -1859,61 +1968,56 @@ function mPeaks(slots){
 }
 function getV(id){return parseFloat(el(id)?.value)||0;}
 
+// Trois modèles :
+//  tiers   : WGI investit (dette + fonds propres), waterfall Art. 4.3, partage WGI / client.
+//  propres : vente de la BESS au client. Le client investit et garde tous les revenus nets. Pas de WGI.
+//  leasing : WGI investit, le client paie un loyer et garde les revenus nets moins le loyer.
 function calcFin(rev){
-  const capex=(parseFloat(el('fin-capex-batt').value)||0)+(parseFloat(el('fin-capex-install').value)||0)+(parseFloat(el('fin-capex-recycle').value)||0)-(parseFloat(el('fin-capex-subsidy').value)||0);
+  const model=S.finModel;
+  const capex=getV('fin-capex-batt')+getV('fin-capex-install')+getV('fin-capex-recycle')-getV('fin-capex-subsidy');
   const opex=getV('fin-opex'),ems=getV('fin-ems');
   const wacc=getV('fin-wacc')/100,dur=parseInt(el('fin-duration').value)||15;
   const infla=getV('fin-inflation')/100;
-  const dr=getV('fin-debt-ratio')/100;
+  const dr=model==='propres'?0:getV('fin-debt-ratio')/100;
   const equity=capex*(1-dr),debt=capex*dr;
   const lr=getV('fin-loan-rate')/100,ly=parseInt(el('fin-loan-years').value)||7;
   const realAnnuity=debt>0?pmt(lr,ly,debt):0;
-  const wgiShare=getV('fin-wgi-share')/100;
-  // Contractual amortization rate (Art 4.3) — deducted BEFORE split
-  const contractRate=(el('fin-contract-rate')?getV('fin-contract-rate'):7.5)/100;
-  const amortYrs=el('fin-amort-years')?(parseInt(el('fin-amort-years').value)||dur):dur;
-  const contractualDeduction=capex>0?pmt(contractRate,amortYrs,capex):0;
-  // Aggregator fees
-  const fcrAgg=getV('base-fcr-agg')/100,afrAgg=getV('base-afrr-agg')/100;
-  const gridRevs=rev.fcr+rev.afrr+rev.imbal+rev.arb;
-  const aggFees=gridRevs*Math.max(fcrAgg,afrAgg);
-  const totalDeductions=aggFees+contractualDeduction+opex+ems;
-  const netRev0=rev.total-totalDeductions; // can be negative
-
-  const cfs=[],cfsC=[],netRevs=[];
+  const wgiShare=model==='tiers'?getV('fin-wgi-share')/100:0;
+  const contractRate=getV('fin-contract-rate')/100;
+  const amortYrs=parseInt(el('fin-amort-years')?.value)||dur;
+  const contractualDeduction=(model==='tiers'&&capex>0)?pmt(contractRate,amortYrs,capex):0;
+  const lease=model==='leasing'?getV('fin-lease-annual'):0;
+  const aggFees=rev.aggFees||0;
+  const rows=[],cfs=[],cfsC=[],netRevs=[];
   for(let y=1;y<=dur;y++){
     const inf=Math.pow(1+infla,y-1);
-    const bruts=rev.total*inf;
-    const agg=aggFees*inf, opsD=(opex+ems)*inf;
-    const nets=bruts-agg-contractualDeduction-opsD;
-    netRevs.push(nets);
-    if(S.finModel==='tiers'){
-      // Client floor = 0; if nets<=0, WGI absorbs all
-      const clientCF=Math.max(0,nets*(1-wgiShare));
-      const wgiOps=nets>0?nets*wgiShare:(bruts-agg-opsD); // all if nets<=0
-      const bankPay=y<=ly?realAnnuity:0;
-      cfs.push(wgiOps-bankPay); cfsC.push(clientCF);
-    } else if(S.finModel==='propres'){
-      const cf=(bruts-agg-opsD);
-      cfs.push(cf);cfsC.push(cf);
+    const bruts=rev.total*inf,agg=aggFees*inf,ops=(opex+ems)*inf;
+    const bank=(model!=='propres'&&y<=ly)?realAnnuity:0;
+    let nets,wgi=0,client=0,partW=0;
+    if(model==='tiers'){
+      nets=bruts-agg-contractualDeduction-ops;
+      client=Math.max(0,nets*(1-wgiShare));                 // plancher client = 0
+      partW=nets>0?nets*wgiShare:(bruts-agg-ops);            // si nets <= 0, WGI absorbe tout
+      wgi=partW-bank;
+    } else if(model==='propres'){
+      nets=bruts-agg-ops;client=nets;wgi=nets;               // cfs = flux de l'investisseur = le client
     } else {
-      const lease=getV('fin-lease-annual');
-      const bankPay=y<=ly?realAnnuity:0;
-      cfs.push(lease-bankPay);
-      cfsC.push(bruts-agg-opsD-lease);
+      nets=bruts-agg-ops;client=nets-lease;partW=lease;wgi=lease-bank;
     }
+    netRevs.push(nets);cfs.push(wgi);cfsC.push(client);
+    rows.push({y,bruts,agg,ops,contract:contractualDeduction,nets,partW,bank,lease,wgi,client});
   }
-  const cfTotal=cfs.reduce((a,b)=>a+b,0),cfMoy=cfTotal/dur;
-  const invBase=S.finModel==='tiers'?equity:capex;
+  const invBase=model==='tiers'?equity:capex;
   let npv=-invBase;cfs.forEach((c,i)=>npv+=c/Math.pow(1+wacc,i+1));
   const irrV=irrCalc(invBase,cfs);
-  // Payback: cumulative (bruts - agg - opsD) >= capex
-  const payback=(()=>{let cp=0;for(let i=0;i<cfs.length;i++){const inf=Math.pow(1+infla,i);const net=(rev.total-aggFees-opex-ems)*inf;cp+=net;if(cp>=capex)return i+(capex-(cp-net))/net;}return null;})();
-  return {capex,cap:capex,equity,debt,realAnnuity,contractualDeduction,rev,
-    aggFees,opex,ems,totalDeductions,deductions:totalDeductions,netRev:netRev0,
-    cfs,cfsC,cfTotal,cfMoy,npv,irr:irrV,payback,
-    ip:invBase>0?(npv+invBase)/invBase:0,dur,wgiShare,netRevs,
-    annuity:realAnnuity};
+  const cfTotal=cfs.reduce((a,b)=>a+b,0);
+  // Payback du CAPEX sur les revenus nets du projet (avant partage)
+  const payback=(()=>{let cp=0;for(let i=0;i<rows.length;i++){const net=rows[i].bruts-rows[i].agg-rows[i].ops;cp+=net;if(cp>=capex&&net>0)return i+(capex-(cp-net))/net;}return null;})();
+  const totalDeductions=aggFees+contractualDeduction+opex+ems;
+  return {model,capex,cap:capex,equity,debt,realAnnuity,annuity:realAnnuity,contractualDeduction,rev,
+    aggFees,opex,ems,lease,totalDeductions,deductions:totalDeductions,netRev:netRevs[0],
+    rows,cfs,cfsC,cfTotal,cfMoy:cfTotal/dur,npv,irr:irrV,payback,invBase,
+    ip:invBase>0?(npv+invBase)/invBase:0,dur,wgiShare,netRevs};
 }
 
 // ═══════════════════════ RUN SIMULATION ═══════════════════════
@@ -1935,74 +2039,100 @@ function runSimulation(){
     const baseline=data.map(s=>({...s,bAC:0,netGrid:s.cons-s.pv,soc:0}));
     const simC=runDispatch(data,battCfg,'cons'),simB=runDispatch(data,battCfg,'base'),simO=runDispatch(data,battCfg,'opti');
     const naC=runDispatch(data,battCfg,'cons',true),naB=runDispatch(data,battCfg,'base',true),naO=runDispatch(data,battCfg,'opti',true);
-    const revC=calcRevenues(baseline,simC,'cons',naC),revB=calcRevenues(baseline,simB,'base',naB),revO=calcRevenues(baseline,simO,'opti',naO);
+    const revC=calcRevenues(baseline,simC,'cons',naC,battCfg),revB=calcRevenues(baseline,simB,'base',naB,battCfg),revO=calcRevenues(baseline,simO,'opti',naO,battCfg);
     const finB=calcFin(revB),finC=calcFin(revC),finO=calcFin(revO);
-    S.simResults={baseline,simB,revC,revB,revO,finB,finC,finO,battCfg,data};
+    S.simResults={baseline,simB:revB.sim,revC,revB,revO,finB,finC,finO,battCfg,data};
     next();
   },50);
   next();
 }
 
+// Libellés dépendant du modèle de financement : en vente au client, WGI n'apparaît nulle part.
+const FIN_LABELS={
+  tiers:{name:'Tiers-investissement WGI',inv:'WGI',invLbl:'Investissement WGI (fonds propres)'},
+  propres:{name:'Vente au client (fonds propres client)',inv:'client',invLbl:'Investissement client'},
+  leasing:{name:'Leasing WGI',inv:'WGI',invLbl:'Investissement WGI'},
+};
 function render(){
-  const {baseline,simB,revC,revB,revO,finB,finC,finO,data}=S.simResults;
+  const {baseline,simB,revC,revB,revO,finB,finC,finO}=S.simResults;
+  const L=FIN_LABELS[finB.model];
   el('res-placeholder').classList.add('hidden');
   el('res-content').classList.remove('hidden');
   const cap=parseFloat(el('batt-cap').value)||215,pow=parseFloat(el('batt-pow').value)||100;
-  el('res-title').textContent=`BESS ${cap} kWh / ${pow} kW — ${S.selectedCity||''}`;
-  el('res-sub').textContent=`${fmt(baseline.length)} quarts d'heure · ${S.pvMode==='none'?'Sans PV':(S.pvMode==='simulate'?`PV simulé ${el('pv-kwc').value} kWc`:'PV mesuré')} · Modèle ${S.finModel}`;
+  el('res-title').textContent=`BESS ${cap} kWh / ${pow} kW`;
+  el('res-sub').textContent=`${fmt(baseline.length)} quarts d'heure · ${S.pvMode==='none'?'Sans PV':(S.pvMode==='simulate'?`PV simulé ${el('pv-kwc').value} kWc`:'PV mesuré')} · ${L.name}`;
 
-  // KPIs
   el('res-kpis').innerHTML=`
-    <div class="kpi blue"><div class="kl">Revenus bruts/an</div><div class="kv">${fmt(revB.total/1000,1)} k€</div><div class="ks">Scénario Base</div></div>
-    <div class="kpi green"><div class="kl">TRI WGI</div><div class="kv">${finB.irr?fmt(finB.irr*100,1)+'%':'n/a'}</div><div class="ks">Taux de rentabilité interne</div></div>
-    <div class="kpi gold"><div class="kl">Payback CAPEX</div><div class="kv">${finB.payback?fmt(finB.payback,1)+' ans':'n/a'}</div><div class="ks">CAPEX ÷ revenus nets</div></div>
-    <div class="kpi teal"><div class="kl">VAN (WACC ${el('fin-wacc').value}%)</div><div class="kv">${fmt(finB.npv/1000,1)} k€</div><div class="ks">Scénario Base</div></div>
-    <div class="kpi red"><div class="kl">CAPEX Net</div><div class="kv">${fmt(finB.cap/1000,1)} k€</div><div class="ks">Investissement WGI</div></div>
-  `;
+    <div class="kpi blue"><div class="kl">Revenus bruts/an</div><div class="kv">${fmt(revB.total/1000,1)} k€</div><div class="ks">Scénario Base, après règles de cumul</div></div>
+    <div class="kpi green"><div class="kl">TRI ${L.inv}</div><div class="kv">${finB.irr?fmt(finB.irr*100,1)+'%':'n/a'}</div><div class="ks">Sur ${L.invLbl.toLowerCase()}</div></div>
+    <div class="kpi gold"><div class="kl">Payback CAPEX</div><div class="kv">${finB.payback?fmt(finB.payback,1)+' ans':'n/a'}</div><div class="ks">CAPEX ÷ revenus nets du projet</div></div>
+    <div class="kpi teal"><div class="kl">VAN ${L.inv} (${el('fin-wacc').value}%)</div><div class="kv">${fmt(finB.npv/1000,1)} k€</div><div class="ks">Scénario Base</div></div>
+    <div class="kpi red"><div class="kl">${L.invLbl}</div><div class="kv">${fmt(finB.invBase/1000,1)} k€</div><div class="ks">CAPEX net ${fmt(finB.capex/1000,1)} k€</div></div>`;
 
-  // Before / After
-  const tCB=baseline.reduce((a,b)=>a+Math.max(0,b.netGrid)*0.25,0)/1000;
-  const tCA=simB.reduce((a,b)=>a+Math.max(0,b.netGrid)*0.25,0)/1000;
-  const tIB=baseline.reduce((a,b)=>a+Math.max(0,-b.netGrid)*0.25,0)/1000;
-  const tIA=simB.reduce((a,b)=>a+Math.max(0,-b.netGrid)*0.25,0)/1000;
+  // Avant / après
+  const tCB=baseline.reduce((a,b)=>a+Math.max(0,b.netGrid)*0.25,0)/1000,tCA=simB.reduce((a,b)=>a+Math.max(0,b.netGrid)*0.25,0)/1000;
+  const tIB=baseline.reduce((a,b)=>a+Math.max(0,-b.netGrid)*0.25,0)/1000,tIA=simB.reduce((a,b)=>a+Math.max(0,-b.netGrid)*0.25,0)/1000;
   const mPB=mPeaks(baseline),mPA=mPeaks(simB);
   const avgPB=Object.values(mPB).reduce((a,b)=>a+b,0)/Math.max(1,Object.keys(mPB).length);
   const avgPA=Object.values(mPA).reduce((a,b)=>a+b,0)/Math.max(1,Object.keys(mPA).length);
   const totalPV=baseline.reduce((a,b)=>a+b.pv*0.25,0)/1000;
   const selfB=totalPV>0?(totalPV-tIB)/totalPV*100:0,selfA=totalPV>0?(totalPV-tIA)/totalPV*100:0;
-  const cycles=simB.reduce((a,b)=>a+Math.max(0,-b.bAC)*0.25,0)/cap;
   const mkT=rows=>'<div>'+rows.map(([l,v])=>`<div class="dr"><span class="dl">${l}</span><span class="dv">${v}</span></div>`).join('')+'</div>';
+  const al=revB.alloc;
   el('res-before').innerHTML=mkT([['Soutirage réseau',fmt(tCB,1)+' MWh'],['Injection réseau',fmt(tIB,1)+' MWh'],['Pic mensuel moyen',fmt(avgPB,0)+' kW'],['Autoconsommation PV',fmt(selfB,1)+' %']]);
-  el('res-after').innerHTML=mkT([['Soutirage réseau',fmt(tCA,1)+' MWh'],['Injection réseau',fmt(tIA,1)+' MWh'],['Pic mensuel moyen',fmt(avgPA,0)+' kW'],['Autoconsommation PV',fmt(selfA,1)+' %'],['Réduction pic',fmt(avgPB-avgPA,0)+' kW'],['Cycles batterie/an',fmt(cycles,0)]]);
+  el('res-after').innerHTML=mkT([['Soutirage réseau',fmt(tCA,1)+' MWh'],['Injection réseau',fmt(tIA,1)+' MWh'],['Pic mensuel moyen',fmt(avgPA,0)+' kW'],['Autoconsommation PV',fmt(selfA,1)+' %'],['Réduction pic',fmt(avgPB-avgPA,0)+' kW'],['Cycles site / jour',fmt(revB.cycles,2)],['Allocation FCR / aFRR / site',`${fmt(al.fF*100)} / ${fmt(al.aF*100)} / ${fmt(al.sF*100)} %`]]);
 
-  // Revenue table
-  const tot=revB.total;
-  const rows=[['⚡ Autoconsommation',revB.autoconso,'#16a34a'],['📉 Peak Shaving',revB.peak,'#2563eb'],['📈 Arbitrage',revB.arb,'#7c3aed'],['🔄 FCR',revB.fcr,'#0d9488'],['⚡ aFRR',revB.afrr,'#f59e0b'],['📊 Imbalance',revB.imbal,'#6b7280']];
-  let rHTML='<thead><tr><th>Source</th><th>€/an</th><th>%</th><th style="min-width:100px">Part</th></tr></thead><tbody>';
-  rows.forEach(([l,v,c])=>{const p=tot>0?v/tot*100:0;rHTML+=`<tr><td>${l}</td><td class="pos">${fE(v,0)}</td><td>${fmt(p,1)}%</td><td><div class="rev-bar-wrap"><div class="rev-bar-fill" style="width:${p}%;background:${c};height:7px;border-radius:4px"></div></div></td></tr>`;});
-  rHTML+=`<tr class="total-row"><td>Total Brut</td><td>${fE(tot,0)}</td><td>100%</td><td></td></tr><tr class="deduct-row"><td>— Frais agrégateurs</td><td>-${fE(finB.aggFees,0)}</td><td></td><td></td></tr><tr class="deduct-row"><td>— OPEX + EMS</td><td>-${fE(getV('fin-opex')+getV('fin-ems'),0)}</td><td></td><td></td></tr><tr class="net-row"><td>Revenus nets à partager</td><td>${fE(finB.netRev,0)}</td><td></td><td></td></tr></tbody>`;
-  el('res-rev-table').innerHTML=rHTML;
+  // Revenus (Base) + waterfall selon le modèle
+  const r0=finB.rows[0],tot=revB.total;
+  const src=[['⚡ Autoconsommation',revB.autoconso,'#16a34a'],['📉 Peak Shaving',revB.peak,'#2563eb'],['📈 Arbitrage',revB.arb,'#7c3aed'],['🔄 FCR',revB.fcr,'#0d9488'],['⚡ aFRR',revB.afrr,'#f59e0b'],['📊 Imbalance',revB.imbal,'#6b7280']];
+  let h='<thead><tr><th>Source</th><th>€/an</th><th>%</th><th style="min-width:100px">Part</th></tr></thead><tbody>';
+  src.forEach(([l,v,c])=>{const pc=tot>0?v/tot*100:0;h+=`<tr><td>${l}</td><td class="pos">${fE(v,0)}</td><td>${fmt(pc,1)}%</td><td><div class="rev-bar-wrap"><div class="rev-bar-fill" style="width:${pc}%;background:${c}"></div></div></td></tr>`;});
+  const ded=(l,v)=>`<tr class="deduct-row"><td>− ${l}</td><td>-${fE(v,0)}</td><td></td><td></td></tr>`;
+  h+=`<tr class="total-row"><td>Total brut (an 1)</td><td>${fE(tot,0)}</td><td>100%</td><td></td></tr>`+ded('Commissions agrégateur (FCR, aFRR, imbalance)',r0.agg)+ded('OPEX + EMS',r0.ops);
+  if(finB.model==='tiers'){
+    h+=ded('Amortissement contractuel WGI (Art. 4.3)',r0.contract)+`<tr class="net-row"><td>Revenus nets à partager</td><td>${fE(r0.nets,0)}</td><td></td><td></td></tr>
+      <tr><td>&nbsp;&nbsp;Part WGI (${fmt(finB.wgiShare*100)} %)</td><td>${fE(r0.partW,0)}</td><td></td><td></td></tr><tr><td>&nbsp;&nbsp;Part client (${fmt(100-finB.wgiShare*100)} %)</td><td>${fE(r0.client,0)}</td><td></td><td></td></tr>`;
+  } else if(finB.model==='propres'){
+    h+=`<tr class="net-row"><td>Gain net annuel du client</td><td>${fE(r0.nets,0)}</td><td></td><td></td></tr>`;
+  } else {
+    h+=`<tr class="net-row"><td>Revenus nets du projet</td><td>${fE(r0.nets,0)}</td><td></td><td></td></tr>`+ded('Loyer payé à WGI',r0.lease)+`<tr class="net-row"><td>Gain net du client</td><td>${fE(r0.client,0)}</td><td></td><td></td></tr>`;
+  }
+  if(revB.notes.length)h+=`<tr><td colspan="4"><div class="ib warn" style="font-size:.68rem">Règles de cumul appliquées : ${revB.notes.join(' · ')}</div></td></tr>`;
+  el('res-rev-table').innerHTML=h+'</tbody>';
 
-  // Scenario compare
-  const scBlock=(f,r,lbl,cls)=>`<div class="scen-col ${cls}"><div class="scen-hdr">${lbl}</div>${[['Revenus bruts',fE(r.total,0)],['FCR + aFRR',fE(r.fcr+r.afrr,0)],['Autoconso + Peak',fE(r.autoconso+r.peak,0)],['Revenus nets',fE(r.total-f.deductions,0)],['Part WGI/an',fE(f.cfs[0],0)],['Part client/an',fE(f.cfsC[0],0)],['TRI WGI',f.irr?fmt(f.irr*100,1)+'%':'n/a'],['VAN',fE(f.npv,0)],['Payback',f.payback?fmt(f.payback,1)+' ans':'n/a']].map(([l,v])=>`<div class="scen-row"><span class="scen-lbl">${l}</span><span class="scen-val">${v}</span></div>`).join('')}</div>`;
+  // Comparaison des scénarios
+  const scBlock=(f,r,lbl,cls)=>{
+    const a=r.alloc,r0=f.rows[0];
+    const rows=[['Allocation FCR / aFRR / site',`${fmt(a.fF*100)} / ${fmt(a.aF*100)} / ${fmt(a.sF*100)} %`],['Revenus bruts',fE(r.total,0)],['FCR + aFRR',fE(r.fcr+r.afrr,0)],['Autoconso + pointe',fE(r.autoconso+r.peak,0)],[r.pick==='imbal'?'Imbalance (retenu)':'Arbitrage (retenu)',fE(r.pick==='imbal'?r.imbal:r.arb,0)],['Commissions + OPEX',fE(r0.agg+r0.ops,0)]];
+    if(f.model==='tiers')rows.push(['Revenus nets à partager',fE(r0.nets,0)],['Part WGI an 1',fE(r0.partW,0)],['Part client an 1',fE(r0.client,0)],['TRI WGI',f.irr?fmt(f.irr*100,1)+'%':'n/a'],['VAN WGI',fE(f.npv,0)]);
+    else if(f.model==='propres')rows.push(['Gain net client an 1',fE(r0.client,0)],['TRI client',f.irr?fmt(f.irr*100,1)+'%':'n/a'],['VAN client',fE(f.npv,0)]);
+    else rows.push(['Loyer WGI',fE(r0.lease,0)],['Gain net client an 1',fE(r0.client,0)],['TRI WGI',f.irr?fmt(f.irr*100,1)+'%':'n/a'],['VAN WGI',fE(f.npv,0)]);
+    rows.push(['Payback CAPEX',f.payback?fmt(f.payback,1)+' ans':'n/a']);
+    return `<div class="scen-col ${cls}"><div class="scen-hdr">${lbl}</div>${rows.map(([l,v])=>`<div class="scen-row"><span class="scen-lbl">${l}</span><span class="scen-val">${v}</span></div>`).join('')}${r.notes.length?`<div class="scen-row" style="font-size:.64rem;color:#7a4400;display:block">${r.notes.join('<br/>')}</div>`:''}</div>`;
+  };
   el('res-scen-compare').innerHTML=scBlock(finC,revC,'🔴 Conservateur','cons')+scBlock(finB,revB,'🔵 Base','base')+scBlock(finO,revO,'🟢 Optimiste','opti');
 
-  // CF table
-  let cfHTML='<thead><tr><th>Année</th><th>Rev. bruts (€)</th><th>Frais (€)</th><th>Part WGI (€)</th><th>Annuité (€)</th><th>CF WGI (€)</th><th>CF client (€)</th><th>Cumulé WGI (€)</th></tr></thead><tbody>';
-  let cum=0;
-  for(let y=1;y<=finB.dur;y++){
-    const inf=Math.pow(1+(getV('fin-inflation')||1.5)/100,y-1);
-    const rev=revB.total*inf,fees=finB.deductions*inf,ann=y<=(parseInt(el('fin-loan-years').value)||7)?finB.annuity:0;
-    const cf=finB.cfs[y-1],cfc=finB.cfsC[y-1];cum+=cf;
-    cfHTML+=`<tr><td>An ${y}</td><td>${fmt(rev,0)}</td><td class="neg">${fmt(fees,0)}</td><td>${fmt((rev-fees)*(getV('fin-wgi-share')/100),0)}</td><td class="neg">${fmt(ann,0)}</td><td class="${cf>=0?'pos':'neg'}">${fmt(cf,0)}</td><td class="${cfc>=0?'pos':'neg'}">${fmt(cfc,0)}</td><td class="${cum>=0?'pos':'neg'}">${fmt(cum,0)}</td></tr>`;
+  // Cash-flows annuels (Base)
+  const n0=v=>`<td class="${v>=0?'pos':'neg'}">${fmt(v,0)}</td>`;
+  let cols,line;
+  if(finB.model==='tiers'){
+    cols=['Année','Rev. bruts','Commissions + OPEX','Amort. contractuel','Nets à partager','Part WGI','Annuité bancaire','CF WGI','CF client','Cumulé WGI'];
+    line=r=>`<td>${fmt(r.bruts,0)}</td><td class="neg">${fmt(r.agg+r.ops,0)}</td><td class="neg">${fmt(r.contract,0)}</td>${n0(r.nets)}<td>${fmt(r.partW,0)}</td><td class="neg">${fmt(r.bank,0)}</td>${n0(r.wgi)}${n0(r.client)}`;
+  } else if(finB.model==='propres'){
+    cols=['Année','Rev. bruts','Commissions','OPEX + EMS','CF client','Cumulé client'];
+    line=r=>`<td>${fmt(r.bruts,0)}</td><td class="neg">${fmt(r.agg,0)}</td><td class="neg">${fmt(r.ops,0)}</td>${n0(r.client)}`;
+  } else {
+    cols=['Année','Rev. bruts','Commissions + OPEX','Loyer','Annuité bancaire','CF WGI','CF client','Cumulé WGI'];
+    line=r=>`<td>${fmt(r.bruts,0)}</td><td class="neg">${fmt(r.agg+r.ops,0)}</td><td>${fmt(r.lease,0)}</td><td class="neg">${fmt(r.bank,0)}</td>${n0(r.wgi)}${n0(r.client)}`;
   }
-  cfHTML+='<tfoot><tr><td>Total</td><td></td><td></td><td></td><td></td><td class="'+( finB.cfTotal>=0?'pos':'neg')+'">'+fmt(finB.cfTotal,0)+'</td><td class="'+( finB.cfsC.reduce((a,b)=>a+b,0)>=0?'pos':'neg')+'">'+fmt(finB.cfsC.reduce((a,b)=>a+b,0),0)+'</td><td></td></tr></tfoot>';
-  el('res-cf-table').innerHTML=cfHTML;
+  let cum=-finB.invBase;
+  let cf=`<thead><tr>${cols.map(c=>`<th>${c}${c==='Année'?'':' (€)'}</th>`).join('')}</tr></thead><tbody><tr><td>An 0</td><td colspan="${cols.length-2}" style="text-align:left">${L.invLbl}</td>${n0(cum)}</tr>`;
+  finB.rows.forEach(r=>{cum+=finB.model==='propres'?r.client:r.wgi;cf+=`<tr><td>An ${r.y}</td>${line(r)}${n0(cum)}</tr>`;});
+  el('res-cf-table').innerHTML=cf+'</tbody>';
 
-  // NPV summary
-  const npvItems=[{l:'CF Total non actualisé',v:fE(finB.cfTotal,0),c:'var(--gp)'},{l:`VAN (WACC ${el('fin-wacc').value}%)`,v:fE(finB.npv,0),c:'var(--green)'},{l:'Indice de profitabilité',v:fmt(finB.ip,2)+'x',c:'#b45309'},{l:'TRI (IRR)',v:finB.irr?fmt(finB.irr*100,1)+'%':'n/a',c:'var(--teal)'},{l:'Payback CAPEX',v:finB.payback?fmt(finB.payback,1)+' ans':'n/a',c:'#b45309'}];
+  const npvItems=[{l:'CF total non actualisé',v:fE(finB.cfTotal,0),c:'var(--gp)'},{l:`VAN ${L.inv} (${el('fin-wacc').value}%)`,v:fE(finB.npv,0),c:'var(--green)'},{l:'Indice de profitabilité',v:fmt(finB.ip,2)+'x',c:'#b45309'},{l:`TRI ${L.inv}`,v:finB.irr?fmt(finB.irr*100,1)+'%':'n/a',c:'var(--teal)'},{l:'Payback CAPEX',v:finB.payback?fmt(finB.payback,1)+' ans':'n/a',c:'#b45309'}];
   el('res-npv-grid').innerHTML=npvItems.map(({l,v,c})=>`<div style="text-align:center"><div style="font-size:.6rem;color:var(--g400);margin-bottom:3px">${l}</div><div style="font-size:.9rem;font-weight:700;font-family:'DM Mono',monospace;color:${c}">${v}</div></div>`).join('');
-  el('res-npv-note').textContent=`Modèle ${S.finModel} · VAN sur fonds propres WGI (${fE(finB.equity,0)}) · WACC ${el('fin-wacc').value}%`;
+  el('res-npv-note').textContent=`${L.name} · VAN et TRI calculés sur ${L.invLbl.toLowerCase()} (${fE(finB.invBase,0)}) · taux d'actualisation ${el('fin-wacc').value} %`;
 
   renderMonthly(baseline,simB,revB);
   renderWeekly(simB,cap);
@@ -2029,10 +2159,14 @@ function renderWeekly(sim,cap){
 
 function exportCSV(){
   if(!S.simResults)return;
-  const {revC,revB,revO,finB}=S.simResults;
-  const rows=['Résultats BESS WGI','','Scénario,Revenus bruts,FCR+aFRR,Autoconso+Peak,Revenus nets',`Conservateur,${fmt(revC.total)},${fmt(revC.fcr+revC.afrr)},${fmt(revC.autoconso+revC.peak)},${fmt(revC.total-S.simResults.finC.deductions)}`,`Base,${fmt(revB.total)},${fmt(revB.fcr+revB.afrr)},${fmt(revB.autoconso+revB.peak)},${fmt(revB.total-finB.deductions)}`,`Optimiste,${fmt(revO.total)},${fmt(revO.fcr+revO.afrr)},${fmt(revO.autoconso+revO.peak)},${fmt(revO.total-S.simResults.finO.deductions)}`,'','Cash Flows annuels (Base)','Année,CF WGI,CF Client',...finB.cfs.map((c,i)=>`${i+1},${fmt(c)},${fmt(finB.cfsC[i])}`),`VAN,${fmt(finB.npv)}`,`TRI,${finB.irr?fmt(finB.irr*100,2):'n/a'}%`,`Payback,${finB.payback?fmt(finB.payback,2):'n/a'} ans`];
-  const b=new Blob([rows.join('\n')],{type:'text/csv;charset=utf-8;'});
-  const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='WGI_BESS_v2.csv';a.click();
+  const {revC,revB,revO,finC,finB,finO}=S.simResults;const L=FIN_LABELS[finB.model];
+  const sc=(n,r,f)=>`${n};${Math.round(r.total)};${Math.round(r.fcr+r.afrr)};${Math.round(r.autoconso+r.peak)};${Math.round(r.arb+r.imbal)};${Math.round(f.rows[0].nets)};${f.irr?fmt(f.irr*100,2):'n/a'}`;
+  const rows=['Résultats BESS',L.name,'',`Scénario;Revenus bruts;FCR+aFRR;Autoconso+pointe;Arbitrage ou imbalance;Revenus nets an 1;TRI ${L.inv} %`,sc('Conservateur',revC,finC),sc('Base',revB,finB),sc('Optimiste',revO,finO),'',
+    'Cash-flows annuels (Base)',finB.model==='propres'?'Année;CF client':'Année;CF WGI;CF client',
+    ...finB.rows.map(r=>finB.model==='propres'?`${r.y};${Math.round(r.client)}`:`${r.y};${Math.round(r.wgi)};${Math.round(r.client)}`),
+    `VAN ${L.inv};${Math.round(finB.npv)}`,`TRI ${L.inv};${finB.irr?fmt(finB.irr*100,2):'n/a'}`,`Payback;${finB.payback?fmt(finB.payback,2):'n/a'}`];
+  const b=new Blob(['﻿'+rows.join('\n')],{type:'text/csv;charset=utf-8;'});
+  const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='WGI_BESS_resultats.csv';a.click();
 }
 
 // ═══════════════════════ FILE UPLOAD HANDLERS ═══════════════════════
@@ -2568,6 +2702,35 @@ el('prof-type').addEventListener('change',profDesc);profDesc();
 ['p-idx-a-hp','p-idx-b-hp','p-idx-a-hc','p-idx-b-hc','p-idx-value','p-idx-reseau','p-idx-autres','p-idx-inj-coef','p-idx-inj-markup'].forEach(id=>el(id).addEventListener('input',updateIdxPreview));
 el('p-idx-source').addEventListener('change',updateBadge);
 updateIdxPreview();
+
+// ═══════════════════════ UI : ALLOCATION BATTERIE ═══════════════════════
+function battCfgFromUI(){return {cap:getV('batt-cap')||215,pow:getV('batt-pow')||100,effRT:(getV('batt-eff')||92)/100,socMin:getV('batt-soc-min')/100,socMax:(getV('batt-soc-max')||90)/100};}
+// Quand une part augmente, l'autre service réservé est réduit pour que FCR + aFRR <= 100 %. Le site prend le reste.
+function updateAlloc(k,changed){
+  const clamp=v=>Math.max(0,Math.min(100,v));
+  let f=clamp(getV(k+'-fcr-frac')),a=clamp(getV(k+'-afrr-frac'));
+  if(f+a>100){if(changed===k+'-afrr-frac')f=100-a;else a=100-f;}
+  el(k+'-fcr-frac').value=f;el(k+'-afrr-frac').value=a;el(k+'-site-frac').value=100-f-a;
+  const seg=(w,c,t)=>w>0?`<div style="width:${w}%;background:${c}">${w>=12?t+' '+fmt(w)+' %':''}</div>`:'';
+  el(k+'-alloc-bar').innerHTML=seg(f,'#0B5A8A','FCR')+seg(a,'#FF9D01','aFRR')+seg(100-f-a,'#8BA31F','Site');
+  const cfg=battCfgFromUI(),al=allocation(k,cfg);
+  let t=`FCR <strong>${fmt(cfg.pow*al.fF,0)} kW</strong> · aFRR <strong>${fmt(cfg.pow*al.aF,0)} kW</strong> · site <strong>${fmt(al.sitePow,0)} kW</strong>. `+
+    `Énergie réservée ±${fmt(al.eRes,0)} kWh (${getV('res-dur')} h) : le site utilise le SoC de ${fmt(al.socLo*100,0)} % à ${fmt(al.socHi*100,0)} % (${fmt(al.usable,0)} kWh utiles sur ${fmt(al.band,0)}).`;
+  if(al.feasibility<1)t+=`<br/><span style="color:var(--red)">⚠️ La réserve dépasse l'énergie disponible : l'offre FCR/aFRR sera réduite à ${fmt(al.feasibility*100,0)} % dans le calcul. Diminuez la réserve ou augmentez la capacité.</span>`;
+  else if(al.sF===0)t+='<br/>Toute la puissance est réservée : aucun revenu d\'autoconsommation, de pointe, d\'arbitrage ni d\'imbalance.';
+  el(k+'-alloc-info').innerHTML=t;
+}
+['cons','base','opti'].forEach(k=>{
+  [k+'-fcr-frac',k+'-afrr-frac'].forEach(id=>el(id).addEventListener('input',()=>updateAlloc(k,id)));
+  updateAlloc(k,'');
+});
+['batt-cap','batt-pow','batt-soc-min','batt-soc-max','res-dur'].forEach(id=>el(id)?.addEventListener('input',()=>['cons','base','opti'].forEach(k=>updateAlloc(k,''))));
+// Vente au client : masquer ce qui concerne le financement WGI
+function updateFinModelUI(){
+  const pr=S.finModel==='propres';
+  ['r-equity','r-annuity'].forEach(id=>{const c=el(id)?.closest('.chip');if(c)c.style.display=pr?'none':'';});
+}
+document.querySelectorAll('.msb').forEach(b=>b.addEventListener('click',updateFinModelUI));
 
 // Init
 updateCapex();updateBadge();
