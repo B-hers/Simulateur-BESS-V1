@@ -427,9 +427,9 @@ footer strong{color:var(--wg-green-d)}
         <!-- INVOICE MODE -->
         <div id="conso-invoice-mode" style="display:none">
           <div class="ib" style="margin-bottom:10px">
-            Importez une ou plusieurs <strong>factures mensuelles</strong> (PDF, format ENGIE/Electrabel type « Données de mesure / Données de facturation »). Extraction par facture : consommations HP/HC, puissances max HP/HC, prix unitaires, <strong>formule d'indexation</strong> (ex. 8,25 + 1,220 × PowerClick), valeur de l'index, coûts réseau et taxes.<br/>
-            Le profil 15 min est ensuite reconstruit mois par mois : forme du profil type choisi, <strong>énergie HP et HC calées</strong> sur la facture, <strong>pointe calée</strong> sur la puissance mesurée. Les mois sans facture sont complétés avec la consommation annuelle glissante indiquée sur la facture la plus récente. Les factures rectificatives (même période) remplacent la version antérieure.
-          </div>
+            Importez une ou plusieurs factures d'électricité en PDF, <strong>tous fournisseurs</strong> (testé sur ENGIE, Luminus, Eneco, TotalEnergies, BEE). Les PDF scannés sont lus par reconnaissance de texte (OCR).<br/>
+            Chaque ligne de facturation est lue et classée : énergie HP/HC, certificats verts, réseau au kWh, réseau en €/kW (pointe ou puissance souscrite), taxes, frais fixes. Contrôles automatiques : somme des postes = total HTVA, formule d'indexation = prix facturé, prix tout compris = prix moyen imprimé.<br/>
+            Le profil 15 min est reconstruit période par période (énergie HP/HC et pointe calées). <strong>La consommation annuelle n'est reprise que si la facture l'indique</strong> ; sinon, saisissez-la pour compléter les mois manquants. Les factures d'acompte n'ont pas de volumes : seule la répartition des coûts est exploitable. Les rectificatives remplacent la version antérieure.</div>
           <div class="upload-zone" id="invoice-upload-zone" ondragover="handleDrag(event,this)" ondragleave="handleDragLeave(this)" ondrop="handleInvoiceDrop(event)">
             <input type="file" accept=".pdf" multiple onchange="handleInvoiceFiles(this.files)"/>
             <div class="uz-icon">🧾</div>
@@ -438,6 +438,7 @@ footer strong{color:var(--wg-green-d)}
           </div>
           <div id="invoice-table" class="data-preview" style="margin-top:10px"></div>
           <div id="invoice-actions" class="hidden" style="margin-top:10px">
+            <div class="f" id="inv-ean-wrap" style="display:none"><label>Compteur (EAN) utilisé</label><select id="inv-ean" onchange="renderInvoiceTable()"></select></div>
             <div class="g3">
               <div class="f"><label>Profil type (forme horaire)</label>
                 <select id="inv-prof-type">
@@ -446,7 +447,7 @@ footer strong{color:var(--wg-green-d)}
                   <option value="industrie" selected>Industrie (2 postes, lun-ven)</option>
                   <option value="neutre">Neutre (plat)</option>
                 </select></div>
-              <div class="f"><label>Consommation annuelle retenue</label><div class="ir"><input type="number" id="inv-annual" min="0" step="0.1"/><div class="iu">MWh/an</div></div></div>
+              <div class="f"><label>Consommation annuelle retenue <span class="h">(si moins de 12 mois facturés)</span></label><div class="ir"><input type="number" id="inv-annual" min="0" step="0.1" placeholder="à saisir si non indiquée"/><div class="iu">MWh/an</div></div></div>
               <div class="f"><label>Année du profil</label><select id="inv-year"><option value="2024">2024</option><option value="2025" selected>2025</option><option value="2026">2026</option></select></div>
             </div>
             <div style="display:flex;gap:7px;flex-wrap:wrap;margin-top:4px">
@@ -1219,7 +1220,7 @@ footer strong{color:var(--wg-green-d)}
 </div>
 
 </main>
-<footer>We Green Invest · Simulateur BESS v2.3 · PV simulé sur profil météo typique belge · Dispatch sur données réelles · Confidentiel</footer>
+<footer>We Green Invest · Simulateur BESS v2.4 · PV simulé sur profil météo typique belge · Dispatch sur données réelles · Confidentiel</footer>
 
 <!-- ═══ MODALE RAPPORT CLIENT ═══ -->
 <div id="report-modal" class="rp-modal hidden" onclick="if(event.target===this)closeReportModal()">
@@ -1264,7 +1265,7 @@ const S = {
   selectedCity: 'Bruxelles',
   selectedOrient: 0,
   pvMethod: 'ratio', // 'ratio' | 'geo'
-  invoices: [],      // factures importées (voir parseInvoiceText)
+  invoices: [],      // factures importées (voir extractInvoice)
 };
 
 const fmt = (v,d=0) => (v==null||isNaN(v))?'—':v.toLocaleString('fr-BE',{minimumFractionDigits:d,maximumFractionDigits:d});
@@ -2610,50 +2611,280 @@ function generateConsoFromProfile(){
     peak>0?'':'<div class="chip orange"><div class="chip-l">Attention</div><div class="chip-v" style="font-size:.66rem">Pointe non calée</div></div>');
 }
 
-// ═══════════════════════ IMPORT FACTURES D'ÉNERGIE (PDF) ═══════════════════════
-// Nombre au format belge : "46.511" (milliers) ou "113,5848" / "2.032,18" (décimales)
-function bnum(s){if(s==null)return null;s=String(s).trim().replace(/\s/g,'');if(/,\d+$/.test(s))s=s.replace(/\./g,'').replace(',','.');else if(/^\d{1,3}(\.\d{3})+$/.test(s))s=s.replace(/\./g,'');const v=parseFloat(s);return isNaN(v)?null:v;}
-const FR_MONTHS={janvier:0,'février':1,fevrier:1,mars:2,avril:3,mai:4,juin:5,juillet:6,'août':7,aout:7,septembre:8,octobre:9,novembre:10,'décembre':11,decembre:11};
-// Extraction ciblée sur le format ENGIE/Electrabel (blocs "Données de mesure" et "Données de facturation").
-// Pour un autre fournisseur, ajouter des variantes de regex ici.
-function parseInvoiceText(raw){
-  const t=raw.replace(/\s+/g,' ');
-  const g=re=>{const m=t.match(re);return m?m[1]:null;};
-  const N='([\\d\\.]+(?:,\\d+)?)';
-  const per=t.match(/P[ée]riode\s+(\d{2})\/(\d{2})\/(\d{4})\s*-\s*(\d{2})\/(\d{2})\/(\d{4})/);
-  if(!per)return null;
-  const inv={start:new Date(+per[3],+per[2]-1,+per[1]),end:new Date(+per[6],+per[5]-1,+per[4])};
-  const fd=t.match(/Facture du (\d{1,2}) ([^\s\d]+) (\d{4})/);
-  inv.factDate=fd?new Date(+fd[3],FR_MONTHS[fd[2].toLowerCase()]??0,+fd[1]):null;
-  inv.docNo=g(/N°\s*Document\.?\s*([\d ]{9,15}\d)/);
-  inv.ean=g(/EAN\s*:?\s*(\d{18})/);
-  // Identité du client et adresse du site (utilisées pour pré-remplir le rapport client)
-  const cm=t.match(/\b(SRL|SA|SPRL|BV|NV|ASBL|SCRL|SC|SCS|SNC)\s+([A-Za-zÀ-ÿ0-9'&\.\- ]+?)\s+(?=(?:BOULEVARD|RUE|AVENUE|CHAUSS|PLACE|CHEMIN|ROUTE|QUAI|DR[EÈ]VE|ALL[EÉ]E|SQUARE|STRAAT|LAAN|STEENWEG|PLEIN)\b)/);
-  if(cm)inv.client=cm[1]+' '+cm[2];
-  inv.site=g(/EAN\s*:\s*\d{18}\s+(?:Votre réf\.\s+\S+\s+)?([A-ZÀ-Ü0-9'\.\- ]+?,\s*\d{4}\s+[A-ZÀ-Ü'\- ]+?)\s+(?=Facturation|Pannes|N°|Notre)/);
-  inv.tva=g(/TVA\s+(BE\s?0?\d{3}\.?\d{3}\.?\d{3})/);
-  inv.pHP=bnum(g(new RegExp('Puissance heures pleines\\s+'+N+'\\s*kW')));
-  inv.pHC=bnum(g(new RegExp('Puissance heures creuses\\s+'+N+'\\s*kW')));
-  const line=lbl=>t.match(new RegExp('Consom\\. heures '+lbl+'\\s+'+N+'\\s*MWh\\s+'+N+'\\s*EUR/MWh(?:\\s+'+N+'\\s*\\+\\s*\\(\\s*'+N+'\\s*x\\s*([A-Za-z]+)\\s*\\))?\\s*'+N+'\\s*EUR'));
-  for(const [k,lbl] of [['HP','pleines'],['HC','creuses']]){
-    const m=line(lbl);
-    if(m){inv['e'+k]=bnum(m[1]);inv['prix'+k]=bnum(m[2]);inv['a'+k]=bnum(m[3]);inv['b'+k]=bnum(m[4]);if(m[5])inv.indexName=m[5];inv['amt'+k]=bnum(m[6]);}
-    else{const kwh=bnum(g(new RegExp('Consom\\. heures '+lbl+'\\s+'+N+'\\s*kWh')));inv['e'+k]=kwh!=null?kwh/1000:null;}
+// ═══════════════════════ EXTRACTION GÉNÉRIQUE DE FACTURES D'ÉLECTRICITÉ ═══════════════════════
+// Entrée : lignes de texte (reconstruites depuis le PDF ou issues de l'OCR).
+// Méthode : 1) repérer chaque poste facturé (libellé, quantité, prix unitaire, montant) ;
+//           2) le classer (énergie HP/HC, certificats verts, réseau proportionnel, réseau capacitaire,
+//              taxes, frais fixes, autres) ; 3) extraire volumes, puissances, période, formule d'indexation ;
+//           4) contrôler la cohérence (somme des postes vs total, formule vs prix facturé).
+// La consommation annuelle n'est renseignée que si la facture l'indique explicitement.
+// Testé sur ENGIE (grands comptes et Flow pro), Luminus, Eneco, TotalEnergies, BEE.
+
+const IX_NUM='-?\\d{1,3}(?:[.\\s]\\d{3})*(?:,\\d+)?|-?\\d+(?:[.,]\\d+)?';
+// Nombre belge : "46.511" milliers, "113,5848" décimales, "2.032,18", "0.00" (TotalEnergies)
+function bnum(s){if(s==null)return null;s=String(s).trim().replace(/[\s ]/g,'');if(!s)return null;
+  if(/,\d+$/.test(s))s=s.replace(/\./g,'').replace(',','.');
+  else if(/^-?\d{1,3}(\.\d{3})+$/.test(s))s=s.replace(/\./g,'');
+  const v=parseFloat(s);return isNaN(v)?null:v;}
+const deacc=s=>s.normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase();
+const SUPPLIERS=[['ENGIE','engie|electrabel'],['Luminus','luminus'],['Eneco','eneco'],['TotalEnergies','totalenergies|lampiris'],
+  ['BEE','belgian eco energy|bee nv|bee\\.eu'],['Mega','mega\\.be|\\bmega\\b'],['Octa+','octa\\+|octaplus'],['Bolt','bolt\\.eu|bolt energie'],
+  ['Essent','essent'],['Energie.be','energie\\.be'],['Elegant','elegant'],['Trevion','trevion'],['Ecopower','ecopower'],['Frank Energie','frank energie']];
+const GRDS=['ORES','Sibelga','Fluvius','RESA','AIEG','AIESH','REW','Elia'];
+
+// Catégories de postes. L'ordre compte : la première règle qui correspond l'emporte.
+const ITEM_RULES=[
+  ['skip',/sous-total|^total|montant total|total (htva|hors|consommation|general|a payer)|^montant|montant a payer pour|nous les versons|ce que vous payez|facture groupee|facturation du|information total|electrabel sa|^base|^tva|acomptes?\b|payer|verser|virement|domiciliation|prix (unitaire )?moyen|consommation annuelle|^periode|^du \d|^\d|^au |evolution|historique|^cout de l'energie eneco$|^frais de distribution et de transport|^taxes \(|^redevances$|si nous|si vous|peuvent etre|seront factures/],
+  ['capacity',/pointe mensuelle|monthly demand|puissance (mesuree|maximale) .*kw|depassement|capacit(e|y) tarif|puissance de pointe/],
+  ['capacityFixed',/puissance (souscrite|contractuelle|mise a disposition)(?! heures)|puissance .{1,3}acc?es/],
+  ['reactive',/reactive|kvarh|inductif|cos ?phi/],
+  ['tax',/accise|cotisation|contribution sur l|redevance de raccordement|fonds energie|surcharge sociale|prelevements|impots?, prelev/],
+  ['green',/energie ?verte|certificats? verts?|renouvelable|garanties? d'origine|cogeneration|contribution energie/],
+  ['network',/\be\d{3}\b|transport|transmission|distribution|reseau|elia|grd|gestion des donnees|terme fixe|soldes regulatoires|services publics|domaine public|surcharge|voirie|impots (sur les revenus|restants)|comptage|puissance souscrite heures/],
+  ['fixed',/redevance (fixe|annuelle)|abonnement|frais fixes?|terme fixe fournisseur/],
+  ['losses',/pertes reseau/],
+  ['misc',/consultant|promo|reduction|remise|frais de rappel|frais administratifs|option electricite verte/],
+  ['injection',/injection/],
+  ['energyHC',/(heures? creuses|\bhc\b|conso-hc|nuit|week-?end|exclusif)/],
+  ['energyHP',/(heures? pleines|\bhp\b|conso-hp|\bjour\b)/],
+  ['energy',/cout.*energie|couts d'energie|energie|consommation|prelevement|conso\b|mono-?horaire|simple/],
+  ['other',/.*/],
+];
+function classify(label){const l=deacc(label);for(const [c,re] of ITEM_RULES)if(re.test(l))return c;return 'other';}
+
+// Lit un poste facturé sur une ligne. Retourne null si la ligne ne porte pas de montant.
+function parseItem(line,ctx){
+  let s=line.replace(/\s+/g,' ').trim();if(s.length<4)return null;
+  // montant = dernier nombre à 2 décimales de la ligne (avec ou sans €/EUR, éventuellement suivi d'un taux de TVA)
+  let am=[...s.matchAll(/(?:€\s*(-?\d{1,3}(?:\.\d{3})*,\d{2})(?!\d))|(?:(-?\d{1,3}(?:\.\d{3})*,\d{2}|-?\d{4,},\d{2})(?!\d)\s*(?:€|EUR)(?!\s*\/|\/|c))/g)].map(m=>[m[0],m[1]||m[2]]);
+  if(!am.length&&ctx&&ctx.colKwhC)am=[...s.matchAll(/(-?\d{1,3}(?:\.\d{3})*,\d{2}|-?\d{4,},\d{2})(?![\d\/])/g)].map(m=>[m[0],m[1]]);
+  if(!am.length)return null;
+  const last=am[am.length-1];const amount=bnum(last[1]);
+  // libellé = texte avant le premier chiffre significatif (codes [a], E520, dates exclus)
+  let lab=s.replace(/^[|\s]+/,'').replace(/^\[[a-z0-9]\]\s*/i,'');
+  const cut=lab.search(/\s(?:\d|€|-\d)|\s\d{2}\/\d{2}\//);
+  let label=(cut>0?lab.slice(0,cut):lab).replace(/[.\s:]+$/,'').trim();
+  const codeM=lab.match(/^(E\d{3})\s/);if(codeM&&cut>0&&label.length<5)label=lab.slice(0,lab.slice(5).search(/\s\d/)+5).trim();
+  { const tk=label.split(' ');const k=tk.findIndex((w,i)=>i>0&&/^(?:[ceo]{2,}|.*(?:ccc|eee|ooo|eeu).*)$/i.test(w));if(k>0)label=tk.slice(0,k).join(' '); }
+  if(!/[a-zA-Zàâéèêëîïôûüç]{3}/.test(label))return null;
+  const rest=s.slice(s.indexOf(label)+label.length);
+  const q=rest.match(new RegExp('('+IX_NUM+')\\s*(kWh|MWh|kW|KW|kVArh|KVArh|jours|j\\b|An\\b|an\\b|mois)'));
+  const p=rest.match(new RegExp('('+IX_NUM+')\\s*(€\\/kWh|EUR\\/kWh|EUR\\/MWh|€\\/MWh|€c|c€|€\\/kW\\/an|€\\/kW\\/mois|€\\/kW|EUR\\/kW|€\\/KVArh|€\\/kVArh|€\\/an|EUR\\/an|€\\/jour)'));
+  const it={label,amount,qty:q?bnum(q[1]):null,qUnit:q?q[2].replace('KW','kW').replace('KVArh','kVArh'):null,price:p?bnum(p[1]):null,pUnit:p?p[2]:null,raw:s};
+  // Tableaux à colonnes sans unités sur la ligne (TotalEnergies : qté kWh et prix c€ en en-tête)
+  if(ctx&&ctx.colKwhC&&!it.qUnit){
+    const nums=[...rest.matchAll(new RegExp(IX_NUM,'g'))].map(m=>m[0]).filter(x=>!/^\d{2}\/\d{2}/.test(x));
+    const clean=rest.replace(/\d{2}\/\d{2}\/\d{4}/g,' ');const ns=[...clean.matchAll(new RegExp(IX_NUM,'g'))].map(m=>bnum(m[0]));
+    // forme : jours, [qté kWh], [prix c€], montant..., total
+    if(ns.length>=5){it.qty=ns[1];it.qUnit='kWh';it.price=ns[2];it.pUnit='c€';}
+    else if(ns.length===4){it.qty=ns[0];it.qUnit='jours';it.price=ns[1];it.pUnit='c€/jour';}
   }
-  inv.index=bnum(g(new RegExp('(?:PowerClick|Index|Indice)[A-Za-z ]*=\\s*'+N+'\\s*EUR/MWh')));
-  inv.annual=bnum(g(new RegExp('Consommation annuelle\\s*:\\s*'+N+'\\s*MWh')));
-  inv.prixMoyen=bnum(g(new RegExp('Prix moyen\\s*:\\s*'+N+'\\s*EUR/MWh')));
-  inv.reseau=bnum(g(new RegExp('Total co[uû]ts de r[ée]seaux\\s+'+N+'\\s*EUR')));
-  const mt=[...t.matchAll(new RegExp('Montant de la facture pour la p[ée]riode[^:]*:\\s*'+N+'\\s*EUR','g'))].map(m=>bnum(m[1])||0);
-  inv.totalHT=mt.length?mt.reduce((a,b)=>a+b,0):null;
-  inv.eTot=(inv.eHP||0)+(inv.eHC||0);
-  if(inv.totalHT&&inv.eTot){
-    inv.reseauMWh=(inv.reseau||0)/inv.eTot;
-    inv.autresMWh=(inv.totalHT-(inv.amtHP||0)-(inv.amtHC||0)-(inv.reseau||0))/inv.eTot;
-  }
-  return inv.eTot>0?inv:null;
+  if(it.pUnit==='€'&&it.qUnit)it.pUnit='€/'+it.qUnit;
+  it.cat=classify(label);
+  if(it.cat==='other'&&it.qty==null&&it.price==null)return null;   // ligne non identifiable : ignorée
+  // prix normalisé en €/MWh pour les postes au kWh/MWh
+  const k={'€/kWh':1000,'EUR/kWh':1000,'EUR/MWh':1,'€/MWh':1,'€c':10,'c€':10}[it.pUnit];
+  if(k&&it.price!=null)it.priceMWh=it.price*k;
+  if(it.qUnit==='MWh'){it.kWh=it.qty*1000;}else if(it.qUnit==='kWh')it.kWh=it.qty;
+  return it;
 }
+
+// Formules d'indexation : "8,25 + (1,220 x PowerClick)", "0,0012861 Belpex + 0,0406654 €/kWh",
+// "0,0324720 + 0,0012830 x Epex DAM EUR/kWh", "0,102 x Belpex-RLP-M + 6,650". Résultat normalisé :
+// prix (€/MWh) = a + b x Index (€/MWh).
+const IDX='(PowerClick|Belpex[\\w\\-]*|Epex(?:\\s*(?:DAM|Spot|BE))?|Endex[\\w\\-]*|ICE[\\w\\-]*|Index|Indice)';
+function findFormulas(t){
+  const F=[];const N='(?<![\\d,.\\/])(\\d+(?:,\\d+)?)(?![\\d,\\/])';const DR='(?:\\d{2}\\/\\d{2}\\/\\d{2,4}\\s*-\\s*\\d{2}\\/\\d{2}\\/\\d{2,4}\\s*)?';
+  const pats=[
+    [new RegExp(N+'\\s*\\+\\s*\\(?\\s*'+N+'\\s*[x×*]\\s*(?:[\\d.,\\s%]|EUR|€){0,40}?'+IDX,'gi'),m=>({a:m[1],b:m[2],idx:m[3]})],
+    [new RegExp(N+'\\s*[x×*]?\\s*'+IDX+'\\s*\\+\\s*'+DR+N+'(?!\\s*[x×*])','gi'),m=>({a:m[3],b:m[1],idx:m[2]})],
+  ];
+  for(const [re,f] of pats){for(const m of t.matchAll(re)){const r=f(m);
+    const before=deacc(t.slice(Math.max(0,m.index-140),m.index));
+    const iP=Math.max(before.lastIndexOf('pleines'),before.lastIndexOf(' hp'),before.lastIndexOf('jour')),iC=Math.max(before.lastIndexOf('creuses'),before.lastIndexOf(' hc'),before.lastIndexOf('nuit'));
+    const slot=iP<0&&iC<0?'mono':(iP>iC?'HP':'HC');
+    let a=bnum(r.a),b=bnum(r.b);if(a==null||b==null||b===0)continue;
+    const s=b<0.01?1000:(b<0.3?10:1);              // mise à l'échelle €/kWh, c€/kWh ou €/MWh
+    F.push({slot,a:a*s,b:b*s,idx:r.idx.replace(/\s+/g,' '),pos:m.index,src:m[0].replace(/\s+/g,' ')});}}
+  // dédoublonner (même slot et mêmes coefficients)
+  return F.filter((f,i)=>F.findIndex(g=>g.slot===f.slot&&Math.abs(g.a-f.a)<1e-6&&Math.abs(g.b-f.b)<1e-6)===i);
+}
+
+const D2='(\\d{2})[./-](\\d{2})[./-](\\d{2,4})';
+const mkDate=(d,m,y)=>new Date(+(y.length===2?'20'+y:y),+m-1,+d);
+const FRM={janvier:0,fevrier:1,mars:2,avril:3,mai:4,juin:5,juillet:6,aout:7,septembre:8,octobre:9,novembre:10,decembre:11};
+
+function extractInvoice(lines){
+  const L=lines.map(l=>l.replace(/[\u2212\u2013]/g,'-').replace(/…/g,'...').replace(/\bk?KWh\b/g,'kWh').replace(/€\/KW\b/g,'€/kW').replace(/(\d), (\d{2})(?=\s*€)/g,'$1,$2').replace(/[.·…_]{3,}/g,' ').replace(/\b[ceosuv0.]{4,}\b/gi,' ').replace(/\s+/g,' ').trim()).filter(Boolean);
+  const T=L.join(' \n ');const t=T.replace(/\s*\n\s*/g,' ');const tl=deacc(t);
+  const inv={warnings:[],items:[]};
+  const g=(re,i=1)=>{const m=t.match(re);return m?m[i]:null;};
+  // Fournisseur, GRD, client, EAN, site
+  inv.supplier=(SUPPLIERS.find(([n,re])=>new RegExp(re,'i').test(t))||['Inconnu'])[0];
+  inv.grd=GRDS.find(x=>new RegExp('\\b'+x+'\\b','i').test(t))||null;
+  inv.eans=[...new Set([...t.matchAll(/\b(54\d{16})\b/g)].map(m=>m[1]))];
+  const cm=t.match(/\b(SRL|SA|SPRL|BV|NV|ASBL|SCRL|SC|SCS|SNC|ACP|VZW|BVBA)\s+([A-Za-zÀ-ÿ0-9'&\.\- ]{2,40}?)\s+(?=(?:c\/o|Att\.|Monsieur|Madame|BOULEVARD|RUE|AVENUE|CHAUSS|PLACE|CHEMIN|ROUTE|QUAI|DR[EÈ]VE|ALL[EÉ]E|SQUARE|STRAAT|LAAN|STEENWEG|PLEIN|Boulevard|Rue|Avenue|Chauss|Place)\b)/);
+  const SUPRE=/electrabel|engie|luminus|eneco|totalenergies|bee nv|ing commercial|belgian eco/i;
+  inv.client=null;
+  const cells=[];lines.forEach(r=>String(r).split(/\s{2,}/).forEach(c=>{c=c.trim();if(c)cells.push(c);}));
+  for(const l of cells){if(SUPRE.test(l))continue;
+    let m=l.match(/^(?:\d+\/\S+\s+)?(SRL|SA|SPRL|BV|NV|ASBL|ACP|VZW|BVBA|SCRL)\s+([A-Za-zÀ-ÿ][\wÀ-ÿ'&\.\-() ]{2,45})$/);
+    if(m){inv.client=(m[1]+' '+m[2]).trim();break;}
+    m=l.match(/^([A-ZÀ-Ü][A-ZÀ-Ü0-9'&\.\- ]{2,45}?)\s*-?\s*(SRL|SA|SPRL|BV|NV|ASBL|BVBA)$/);
+    if(m){inv.client=(m[1].trim()+' '+m[2]).trim();break;}}
+  if(!inv.client&&cm)inv.client=(cm[1]+' '+cm[2]).trim();
+  inv.site=g(/(?:Adresse de (?:livraison|fourniture|consommation)|Adr\. de consommation)\s*:?\s*([^\n]{5,80}?\d{4}\s+[A-Za-zÀ-ÿ'\-\/ ]{3,30}?)(?=\s{1,}(?:Electricit|Électricit|Code|EAN|Votre|Gestionnaire|Pann|Facturation|\d{2}[./])|$)/i)
+    ||g(/EAN\s*:?\s*\d{18}\s+(?:Votre réf\.\s+\S+\s+)?(?:-\s*)?([A-ZÀ-Üa-zà-ü0-9'\.\- ]+?,?\s*\d{4}\s+[A-ZÀ-Üa-zà-ü'\- ]+?)(?=\s+(?:Facturation|Pannes|N°|Notre|Période|Electricit|$))/);
+  if(inv.site)inv.site=inv.site.replace(/\s+-\s+/g,', ').replace(/\s{2,}/g,' ').trim();
+  // Type de document
+  inv.docType=/facture d'acompte|acompte pour la periode/.test(tl)?'acompte':/decompte intermediaire|montant intermediaire/.test(tl)?'intermediaire':/decompte annuel|facture de cloture|facture finale/.test(tl)?'decompte annuel':/releve mensuel|facture mensuelle/.test(tl)?'mensuelle':/votre decompte/.test(tl)?'decompte':'mensuelle';
+  // Date de facture
+  const fd=t.match(/(?:Facture du|Date de factur(?:e|ation)|Date)\s*:?\s*(\d{1,2})[ ./-]([a-zéû]+|\d{2})[ ./-](\d{2,4})/i);
+  if(fd)inv.factDate=/\d/.test(fd[2])?mkDate(fd[1],fd[2],fd[3]):new Date(+fd[3],FRM[deacc(fd[2])]??0,+fd[1]);
+  // Période : première plage de dates proche d'un mot-clé, sinon la première du document
+  const RNG='\\s*:?\\s*(?:du\\s*)?'+D2+'\\s*(?:-|au|à|a)\\s*'+D2;
+  const per=['P[ée]riode de [Ff]acturation','P[ée]riode de consommation[^\\d]{0,40}','Relev[ée] mensuel[^\\d]{0,40}','Acompte pour la p[ée]riode','pour la p[ée]riode du','P[ée]riode','Facturation du','Montant interm[ée]diaire du','\\b']
+    .map(k=>t.match(new RegExp(k+RNG,'i'))).find(Boolean);
+  if(per){const o=per.length===8?1:1;inv.start=mkDate(per[o],per[o+1],per[o+2]);inv.end=mkDate(per[o+3],per[o+4],per[o+5]);
+    inv.days=Math.round((inv.end-inv.start)/864e5)+(/^0?1$/.test(per[o+3])&&inv.end.getDate()===1?0:1);}
+  // Postes
+  const ctx={colKwhC:/\(c€\)/.test(T),ocr:!!lines.ocr};
+  let inSec=!ctx.colKwhC;
+  L.forEach(l=>{
+    if(ctx.colKwhC){if(/Poste à facturer/i.test(l)){inSec=true;return;}if(inSec&&/^Total/i.test(l)){inSec=false;return;}}
+    if(!inSec)return;const it=parseItem(l,ctx);if(it&&it.cat!=='skip')inv.items.push(it);});
+  // retirer les doublons exacts (récapitulatif + annexe) en gardant la version la plus détaillée
+  inv.items=inv.items.filter(it=>!(it.cat==='misc'&&it.amount>0&&inv.items.some(o=>o!==it&&o.amount<0&&Math.abs(o.amount+it.amount)<0.005)));
+  const seen=new Map();inv.items=inv.items.filter(it=>{const k=it.label+'|'+it.amount;if(seen.has(k))return false;seen.set(k,1);return true;});
+  // Volumes
+  const vol=(re)=>{const m=t.match(re);return m?bnum(m[1]):null;};
+  const KW='(\\d{1,3}(?:\\.\\d{3})*(?:,\\d+)?|\\d+)';
+  inv.kwhHP=vol(new RegExp('(?:Consom(?:mation|\\.)?|Prélèvement|Prelevement)\\s+(?:mesurée\\s+)?heures\\s+pleines:?\\s+'+KW+'\\s*kWh','i'))??vol(new RegExp('Conso-HP\\s+'+KW+'\\s*kWh','i'));
+  inv.kwhHC=vol(new RegExp('(?:Consom(?:mation|\\.)?|Prélèvement|Prelevement)\\s+(?:mesurée\\s+)?heures\\s+creuses:?\\s+'+KW+'\\s*kWh','i'))??vol(new RegExp('Conso-HC\\s+'+KW+'\\s*kWh','i'));
+  const mhp=t.match(new RegExp('Consom\\. heures pleines\\s+'+KW+'\\s*MWh'));if(mhp)inv.kwhHP=bnum(mhp[1])*1000;
+  const mhc=t.match(new RegExp('Consom\\. heures creuses\\s+'+KW+'\\s*MWh'));if(mhc)inv.kwhHC=bnum(mhc[1])*1000;
+  // à défaut, quantités des postes énergie
+  const eHP=inv.items.find(i=>i.cat==='energyHP'&&i.kWh),eHC=inv.items.find(i=>i.cat==='energyHC'&&i.kWh),eM=inv.items.find(i=>i.cat==='energy'&&i.kWh);
+  if(inv.kwhHP==null&&eHP)inv.kwhHP=eHP.kWh;if(inv.kwhHC==null&&eHC)inv.kwhHC=eHC.kWh;
+  if(eHP&&eHC&&inv.kwhHP&&Math.abs(eHP.kWh-inv.kwhHP)/inv.kwhHP<0.01)inv.kwhHP=eHP.kWh; // plus précis
+  if(eHP&&eHC&&inv.kwhHC&&Math.abs(eHC.kWh-inv.kwhHC)/inv.kwhHC<0.01)inv.kwhHC=eHC.kWh;
+  inv.kwhMono=(inv.kwhHP==null&&inv.kwhHC==null&&eM)?eM.kWh:null;
+  inv.kwh=(inv.kwhHP||0)+(inv.kwhHC||0)+(inv.kwhMono||0)||null;
+  inv.injHP=vol(new RegExp('Injection[- ](?:HP|heures pleines)\\s+'+KW+'\\s*kWh','i'));inv.injHC=vol(new RegExp('Injection[- ](?:HC|heures creuses)\\s+'+KW+'\\s*kWh','i'));
+  // Puissances
+  const P='(\\d+(?:[.,]\\d+)?)\\s*[kK][wW]\\b';
+  const pmx=[...t.matchAll(new RegExp('Puissance\\s+(?:maximale|mesurée)\\s+heures\\s+(?:(pleines|creuses)\\s+)?'+P,'gi'))];
+  if(pmx.length){inv.pHP=bnum(pmx[0][2]);if(pmx[1])inv.pHC=bnum(pmx[1][2]);}
+  const pc=[...t.matchAll(new RegExp('Puissance heures (pleines|creuses)\\s+'+P,'gi'))];pc.forEach(m=>{if(/pleines/i.test(m[1]))inv.pHP=bnum(m[2]);else inv.pHC=bnum(m[2]);});
+  inv.pMax=vol(new RegExp('PMax\\s+'+P,'i'))??(inv.pHP!=null?Math.max(inv.pHP,inv.pHC||0):null);
+  inv.pContract=vol(new RegExp('(?:P\\. pointe contractuelle|Puissance (?:souscrite|contractuelle|d\'accès|d\'acces))\\s*:?\\s*'+P,'i'));
+  const capIt=inv.items.find(i=>i.cat==='capacity'&&i.qUnit==='kW');if(inv.pMax==null&&capIt)inv.pMax=capIt.qty;
+  inv.cosphi=vol(/Cos\s*phi\s*:?\s*(\d[.,]\d+)/i);
+  // Formules et index
+  inv.formulas=findFormulas(t);
+  const fHP=inv.formulas.find(f=>f.slot==='HP')||inv.formulas.find(f=>f.slot==='mono')||inv.formulas.find(f=>f.slot==='HC'),fHC=inv.formulas.find(f=>f.slot==='HC')||fHP;
+  const ixv=t.match(/(PowerClick|Belpex[\w\-]*|Epex[\w ]*?)(?:\s*\([^)]*\))?\s*[=:]\s*(\d+(?:,\d+)?)/i)||t.match(/Belpex-RLP-M\s+(?:\d{2}\/\d{2}\/\d{2,4}\s*-\s*\d{2}\/\d{2}\/\d{2,4}\s+)?(?:[\d.,]+\s*kWh\s+){1,2}(\d+,\d+)/);
+  inv.indexValue=ixv?bnum(ixv[ixv.length-1]):null;
+  // Agrégats des postes
+  const sum=(c)=>inv.items.filter(i=>c.includes(i.cat)).reduce((a,i)=>a+i.amount,0);
+  inv.amt={energyHP:sum(['energyHP']),energyHC:sum(['energyHC']),energy:sum(['energy']),green:sum(['green']),losses:sum(['losses']),
+    network:sum(['network']),capacity:sum(['capacity']),capacityFixed:sum(['capacityFixed']),reactive:sum(['reactive']),tax:sum(['tax']),fixed:sum(['fixed']),other:sum(['other','injection','misc'])};
+  const pr=(cat,kwh)=>{const it=inv.items.filter(i=>i.cat===cat&&i.priceMWh!=null);if(it.length){const q=it.reduce((a,i)=>a+(i.kWh||0),0);return q?it.reduce((a,i)=>a+i.priceMWh*(i.kWh||0),0)/q:it[0].priceMWh;}return null;};
+  inv.prixHP=pr('energyHP');inv.prixHC=pr('energyHC');inv.prixMono=pr('energy');
+  if(inv.prixHP==null&&inv.prixHC==null&&inv.prixMono!=null&&inv.kwhHP&&inv.kwhHC){inv.prixHP=inv.prixHC=inv.prixMono;}
+  // Index déduit du prix facturé si la formule est connue
+  if(fHP&&inv.indexValue==null&&inv.prixHP!=null)inv.indexValue=(inv.prixHP-fHP.a)/fHP.b,inv.indexDerived=true;
+  if(fHP){const calc=fHP.a+fHP.b*(inv.indexValue||0);inv.formulaCheck=inv.prixHP!=null?(calc-inv.prixHP)/inv.prixHP:null;
+    if(inv.formulaCheck!=null&&Math.abs(inv.formulaCheck)>0.02)inv.warnings.push(`La formule affichée (${fmtN(fHP.a,2)} + ${fmtN(fHP.b,3)} × ${fHP.idx} = ${fmtN(calc,1)} €/MWh) ne redonne pas le prix facturé (${fmtN(inv.prixHP,1)} €/MWh) : vérifier remises ou version tarifaire.`);}
+  inv.fHP=fHP||null;inv.fHC=fHC||null;
+  // Tarifs capacitaires (€/kW/mois)
+  inv.capTariffs=inv.items.filter(i=>(i.cat==='capacity'||i.cat==='capacityFixed')&&i.qty&&i.qUnit==='kW').map(i=>{
+    let perMonth=null;if(i.pUnit==='€/kW/an')perMonth=i.price/12;else if(i.pUnit==='€/kW/mois'||i.pUnit==='€/kW'||i.pUnit==='EUR/kW')perMonth=i.price;else if(i.amount&&i.qty)perMonth=i.amount/i.qty*(30.44/(inv.days||30.44));
+    return {label:i.label,kW:i.qty,perMonth,shaveable:i.cat==='capacity',amount:i.amount};});
+  const peakKW=inv.capTariffs.filter(c=>c.shaveable).map(c=>c.kW);
+  inv.capTariffs.forEach(c=>{if(!c.shaveable&&peakKW.includes(c.kW)&&c.kW!==inv.pContract)c.shaveable=true;});
+  inv.peakTariffMonth=inv.capTariffs.filter(c=>c.shaveable&&c.perMonth).reduce((a,c)=>a+c.perMonth,0)||null;
+  // Total HTVA : lu sur la ligne de son libellé (évite de capter un montant d'une autre ligne)
+  const MONEY=/(-?\d{1,3}(?:\.\d{3})*,\d{2}|-?\d{4,},\d{2})(?![\d\/])/g;
+  const onLine=(re,mode)=>{for(const l of L){if(re.test(l)){const after=l.slice(l.search(re));const m=[...after.matchAll(MONEY)].map(x=>bnum(x[1]));if(m.length)return mode==='first'?m[0]:m[m.length-1];return null;}}return null;};
+  const mt=L.filter(l=>/Montant de la facture pour la p[ée]riode/.test(l)).map(l=>{const m=[...l.matchAll(MONEY)];return m.length?bnum(m[m.length-1][1]):0;});
+  inv.totalHT=mt.length?mt.reduce((a,b)=>a+b,0):(onLine(/Total général HTVA/i)??onLine(/Total\s*\(€\s*h\w{0,3}s?\s*TVA\)/i)??onLine(/Total consommation électricité \(hors TVA\)/i)
+    ??onLine(/Total \(HTVA\)/i)??onLine(/^Total hors TVA/i)??onLine(/Montant total hors TVA/i)??onLine(/Montant intermédiaire/i,'first')??onLine(/Sous-total hors TVA/i));
+  const lump=inv.items.filter(i=>i.cat==='network'&&i.qty==null).reduce((a,i)=>a+i.amount,0);
+  if(inv.totalHT&&lump>0.2*inv.totalHT&&!inv.items.some(i=>i.cat==='capacity'||i.cat==='capacityFixed'))
+    inv.warnings.push('Coûts de réseau facturés en un montant global : la part liée à la puissance (€/kW) n\'est pas séparable, le coût réseau au kWh est donc surestimé.');
+  const itemsSum=inv.items.reduce((a,i)=>a+i.amount,0);
+  inv.itemsSum=itemsSum;
+  if(lines.ocr&&itemsSum>0&&(!inv.totalHT||Math.abs(inv.totalHT-itemsSum)/itemsSum>0.2)){inv.warnings.push(`Total HTVA illisible à l'OCR : somme des postes retenue (${fmtN(itemsSum,2)} €).`);inv.totalHT=itemsSum;}
+  if(inv.totalHT&&inv.items.length){const gap=(inv.totalHT-itemsSum)/inv.totalHT;inv.coverage=1-gap;
+    if(Math.abs(gap)>0.03)inv.warnings.push(`Les postes lus (${fmtN(itemsSum,2)} €) ne correspondent pas au total HTVA (${fmtN(inv.totalHT,2)} €) : ${fmtN(gap*100,1)} % non détaillé.`);}
+  // Coûts unitaires (€/MWh) : uniquement si la facture contient des volumes
+  if(inv.kwh){const M=inv.kwh/1000,a=inv.amt;
+    inv.unit={energy:(a.energyHP+a.energyHC+a.energy)/M,green:a.green/M,losses:a.losses/M,network:a.network/M,capacity:(a.capacity+a.capacityFixed+a.reactive)/M,tax:a.tax/M,fixed:(a.fixed+a.other)/M,allIn:inv.totalHT?inv.totalHT/M:null};
+  } else inv.warnings.push(inv.docType==='acompte'?'Facture d\'acompte : aucun volume en kWh. Seule la répartition des coûts est exploitable.':'Aucun volume en kWh trouvé : pas de coût unitaire calculable.');
+  // Contrôle : prix moyen imprimé par le fournisseur (s'il existe) vs prix tout compris recalculé
+  const pm=t.match(/Prix moyen\s*:\s*([\d.]+,\d+)\s*EUR\/MWh/i)||t.match(/prix moyen HTVA[^\d]{0,60}?([\d]+,\d+)\s*c€\s*\/\s*kWh/i)||t.match(/Prix unitaire moyen \(hors\s*TVA\)\s*=\s*([\d]+,\d+)\s*€\/kWh/i)||t.match(/Prix moyen \(frais de r[ée]seau[^)]*\)\s*:?\s*([\d]+,\d+)\s*€\/kWh/i)||t.match(/31\.\d{2}\.\d{4}\s*\(3\)\s*(?:Electricit[ée])?[^\d]{0,80}?(?:[\d]+,\d+\s*€\/kWh\s*){4}([\d]+,\d+)\s*€\/kWh/i);
+  if(pm){let v=bnum(pm[1]);if(v<1)v*=1000;else if(v<60)v*=10;inv.prixMoyenFacture=v;
+    if(inv.unit&&inv.unit.allIn){inv.prixMoyenEcart=(inv.unit.allIn-v)/v;}}
+  // Consommation annuelle : seulement si indiquée sur la facture
+  const ann=t.match(/Consommation annuelle\s*:?\s*([\d.]+(?:,\d+)?)\s*(kWh|MWh)/i);
+  if(ann){inv.annualMWh=bnum(ann[1])/(ann[2]==='kWh'?1000:1);inv.annualSrc='indiquée sur la facture';}
+  else{const hp=t.match(/Hrs pleines\s+([\d.]+,\d+)/),hc=t.match(/Hrs creuses\s+([\d.]+,\d+)/);
+    if(hp&&hc){inv.annualMWh=(bnum(hp[1])+bnum(hc[1]))/1000;inv.annualSrc='historique annuel de la facture';}}
+  if(inv.annualMWh==null)inv.annualSrc=null;
+  return inv;
+}
+function fmtN(v,d){return v==null||isNaN(v)?'—':v.toLocaleString('fr-BE',{minimumFractionDigits:d,maximumFractionDigits:d});}
+
+// ═══════════════════════ LECTURE DES PDF : LIGNES + OCR ═══════════════════════
+// pdf.js renvoie des fragments de texte positionnés : on les regroupe par ligne (même ordonnée) et on les trie
+// de gauche à droite. Les fragments en double (texte gras surimprimé) sont ignorés.
+async function pdfToLines(pdf){
+  const out=[];
+  for(let p=1;p<=pdf.numPages;p++){
+    const c=await (await pdf.getPage(p)).getTextContent();const rows=[];
+    c.items.forEach(it=>{if(!it.str||!it.str.trim())return;const x=it.transform[4],y=it.transform[5];
+      let r=rows.find(r=>Math.abs(r.y-y)<2.5);if(!r){r={y,items:[]};rows.push(r);}r.items.push({x,s:it.str,w:it.width});});
+    rows.sort((a,b)=>b.y-a.y).forEach(r=>{r.items.sort((a,b)=>a.x-b.x);
+      r.items=r.items.filter((it,k)=>!r.items.slice(0,k).some(o=>o.s===it.s&&Math.abs(o.x-it.x)<2));
+      let s='',end=null;r.items.forEach(i=>{if(end!==null)s+=(i.x-end>3?'  ':(i.x-end>0.5?' ':''));s+=i.s;end=i.x+(i.w||0);});out.push(s.replace(/\s+$/,''));});
+  }
+  return out;
+}
+// OCR des factures scannées (PDF image) : tesseract.js chargé à la demande, langue française.
+const OCR_LIB='https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js';
+function loadScript(src){return new Promise((res,rej)=>{if(document.querySelector(`script[src="${src}"]`))return res();const s=document.createElement('script');s.src=src;s.onload=res;s.onerror=()=>rej(new Error('chargement impossible : '+src));document.head.appendChild(s);});}
+async function ocrPdf(pdf,onProgress){
+  if(typeof Tesseract==='undefined')await loadScript(OCR_LIB);
+  const worker=await Tesseract.createWorker('fra');
+  const lines=[];
+  try{
+    for(let p=1;p<=pdf.numPages;p++){
+      onProgress&&onProgress(p,pdf.numPages);
+      const page=await pdf.getPage(p),vp=page.getViewport({scale:2.6});
+      const cv=document.createElement('canvas');cv.width=vp.width;cv.height=vp.height;
+      await page.render({canvasContext:cv.getContext('2d'),viewport:vp}).promise;
+      const {data}=await worker.recognize(cv,{},{text:true});
+      data.text.split('\n').forEach(l=>lines.push(l));
+    }
+  }finally{await worker.terminate();}
+  lines.ocr=true;return lines;
+}
+
+// ═══════════════════════ IMPORT DES FACTURES ═══════════════════════
 function handleInvoiceDrop(e){e.preventDefault();el('invoice-upload-zone').classList.remove('drag');handleInvoiceFiles(e.dataTransfer.files);}
+// Champs utilisés par la génération du profil et l'application au contrat (MWh, €/MWh)
+function invoiceLegacy(inv){
+  const M=inv.kwh?inv.kwh/1000:0;
+  const kwhOther=inv.items.filter(i=>(i.cat==='other'||i.cat==='misc')&&i.kWh).reduce((a,i)=>a+i.amount,0);
+  return Object.assign(inv,{
+    eHP:inv.kwhHP!=null?inv.kwhHP/1000:null,eHC:inv.kwhHC!=null?inv.kwhHC/1000:null,eTot:M,
+    aHP:inv.fHP?inv.fHP.a:null,bHP:inv.fHP?inv.fHP.b:null,aHC:inv.fHC?inv.fHC.a:null,bHC:inv.fHC?inv.fHC.b:null,
+    indexName:inv.fHP?inv.fHP.idx:null,index:inv.indexValue,annual:inv.annualMWh,
+    reseauMWh:M?inv.amt.network/M:null,
+    autresMWh:M?(inv.amt.green+inv.amt.losses+inv.amt.tax+kwhOther)/M:null,
+    usable:M>0&&!!inv.start});
+}
 async function handleInvoiceFiles(files){
   const txt=el('invoice-upload-text');const errs=[];
   for(const file of files){
@@ -2661,88 +2892,160 @@ async function handleInvoiceFiles(files){
     txt.textContent=`⏳ Lecture de "${file.name}"...`;
     try{
       const pdf=await pdfjsLib.getDocument({data:await file.arrayBuffer()}).promise;
-      let full='';
-      for(let p=1;p<=pdf.numPages;p++){const c=await (await pdf.getPage(p)).getTextContent();full+=c.items.map(i=>i.str).join(' ')+'\n';}
-      const inv=parseInvoiceText(full);
-      if(!inv){errs.push(file.name+' (format non reconnu)');continue;}
-      inv.file=file.name;
-      // Rectificatives : une seule facture par période, la plus récente l'emporte
-      const k=inv.start.getTime();
-      const ex=S.invoices.findIndex(x=>x.start.getTime()===k);
-      if(ex>=0){const old=S.invoices[ex];if(!old.factDate||(inv.factDate&&inv.factDate>=old.factDate))S.invoices[ex]=inv;}
+      let lines=await pdfToLines(pdf);
+      if(lines.join('').replace(/\s/g,'').length<80){ // PDF scanné : pas de texte exploitable
+        txt.textContent=`⏳ "${file.name}" est un scan : reconnaissance du texte (OCR)...`;
+        lines=await ocrPdf(pdf,(p,n)=>{txt.textContent=`⏳ OCR de "${file.name}" : page ${p}/${n}...`;});
+      }
+      const inv=extractInvoice(lines);
+      if(!inv.start&&!inv.totalHT){errs.push(file.name+' (aucune donnée reconnue)');continue;}
+      inv.file=file.name;inv.ocr=!!lines.ocr;inv.lines=lines.slice(0,400);invoiceLegacy(inv);
+      if(inv.ocr)inv.warnings.unshift('Facture scannée lue par OCR : vérifier les montants principaux.');
+      if(inv.eans.length>1)inv.warnings.unshift(`Facture groupée pour ${inv.eans.length} compteurs : les montants additionnent tous les EAN.`);
+      // Rectificatives : une facture par compteur et par période, la plus récente l'emporte
+      const key=x=>(x.eans[0]||'')+'|'+(x.start?x.start.getTime():x.file);
+      const ex=S.invoices.findIndex(x=>key(x)===key(inv));
+      if(ex>=0){const old=S.invoices[ex];if(!old.factDate||(inv.factDate&&inv.factDate>=old.factDate)){inv.replaced=old.file;S.invoices[ex]=inv;}}
       else S.invoices.push(inv);
     }catch(e){errs.push(file.name+' ('+e.message+')');}
   }
-  S.invoices.sort((a,b)=>a.start-b.start);
+  S.invoices.sort((a,b)=>(a.start||0)-(b.start||0));
   txt.textContent=S.invoices.length?`✓ ${S.invoices.length} facture(s) retenue(s)`:'Glisser-déposer une ou plusieurs factures PDF';
   el('invoice-upload-zone').classList.toggle('loaded',S.invoices.length>0);
   renderInvoiceTable(errs);
 }
+const INV_DOC={acompte:'Acompte',intermediaire:'Intermédiaire',decompte:'Décompte','decompte annuel':'Décompte annuel',mensuelle:'Mensuelle'};
+const INV_CAT=[['energyHP','Énergie HP'],['energyHC','Énergie HC'],['energy','Énergie'],['green','Certificats verts / GO'],['losses','Pertes réseau'],['network','Réseau (au kWh)'],
+  ['capacity','Réseau : pointe (€/kW)'],['capacityFixed','Réseau : puissance souscrite'],['reactive','Énergie réactive'],['tax','Taxes et redevances'],['fixed','Frais fixes'],['misc','Remises / divers'],['other','Autres'],['injection','Injection']];
+// Compteur = EAN (ou groupe d'EAN pour une facture groupée)
+const meterKey=i=>i.eans.length?i.eans.join(' + '):'(EAN non lu)';
+function invoiceEANs(){return [...new Set(S.invoices.map(meterKey))];}
+function selectedInvoices(){const e=el('inv-ean')?el('inv-ean').value:'';return S.invoices.filter(i=>!e||meterKey(i)===e);}
 function renderInvoiceTable(errs){
   const I=S.invoices;
   el('invoice-actions').classList.toggle('hidden',!I.length);
   if(!I.length){el('invoice-table').innerHTML='';return;}
-  const last=I[I.length-1];
-  if(last.annual)el('inv-annual').value=last.annual;
-  const f2=v=>v==null?'—':fmt(v,2),f1=v=>v==null?'—':fmt(v,1),f0=v=>v==null?'—':fmt(v,0);
-  const form=(a,b)=>a!=null&&b!=null?`${fmt(a,2)} + ${fmt(b,3)}×idx`:'—';
-  el('invoice-table').innerHTML=`<table><thead><tr><th>Période</th><th>Facture</th><th>HP MWh</th><th>HC MWh</th><th>Pmax HP kW</th><th>Pmax HC kW</th><th>Prix HP</th><th>Prix HC</th><th>Formule HP</th><th>Formule HC</th><th>${last.indexName||'Index'}</th><th>Réseau €/MWh</th><th>Autres €/MWh</th><th>Prix moyen</th></tr></thead><tbody>${
-    I.map(i=>`<tr><td>${i.start.toLocaleDateString('fr-BE')} → ${i.end.toLocaleDateString('fr-BE')}</td><td>${i.factDate?i.factDate.toLocaleDateString('fr-BE'):'—'}</td><td>${f2(i.eHP)}</td><td>${f2(i.eHC)}</td><td>${f0(i.pHP)}</td><td>${f0(i.pHC)}</td><td>${f2(i.prixHP)}</td><td>${f2(i.prixHC)}</td><td>${form(i.aHP,i.bHP)}</td><td>${form(i.aHC,i.bHC)}</td><td>${f2(i.index)}</td><td>${f1(i.reseauMWh)}</td><td>${f1(i.autresMWh)}</td><td>${f2(i.prixMoyen)}</td></tr>`).join('')
-  }</tbody></table>
-  <div class="ib" style="margin-top:6px;font-size:.68rem">${I.length} mois couvert(s) sur 12. Consommation annuelle glissante (dernière facture) : <strong>${last.annual?fmt(last.annual,1)+' MWh':'non trouvée'}</strong>. Les mois manquants seront complétés à partir de cette valeur et de la saisonnalité du profil type.
-  ${errs&&errs.length?'<br/>⚠️ Non lus : '+errs.join(', '):''}</div>`;
+  const f=(v,d=1)=>v==null||isNaN(v)?'—':fmt(v,d);
+  const eans=invoiceEANs(),sel=el('inv-ean'),prev=sel.value;
+  const lab=e=>{const i=S.invoices.find(x=>meterKey(x)===e);return `${e}${i&&(i.client||i.site)?' · '+(i.client||i.site):''}`;};
+  sel.innerHTML=(eans.length>1?'<option value="">Tous les compteurs</option>':'')+eans.map(e=>`<option value="${esc(e)}">${esc(lab(e))}</option>`).join('');
+  if(eans.includes(prev))sel.value=prev;else if(eans.length>1){ // par défaut : le compteur le plus fourni en factures avec volumes
+    const best=eans.map(e=>[e,S.invoices.filter(i=>meterKey(i)===e&&i.usable).length]).sort((a,b)=>b[1]-a[1])[0];sel.value=best[1]?best[0]:'';}
+  el('inv-ean-wrap').style.display=eans.length>1?'':'none';
+  const rows=I.map((i,k)=>{
+    const u=i.unit||{};const chk=[];
+    if(i.coverage!=null)chk.push(Math.abs(1-i.coverage)<0.01?'✓ postes = total':`⚠ ${f((1-i.coverage)*100,1)} % non détaillé`);
+    if(i.formulaCheck!=null)chk.push(Math.abs(i.formulaCheck)<0.02?'✓ formule':'⚠ formule');
+    if(i.prixMoyenEcart!=null)chk.push(Math.abs(i.prixMoyenEcart)<0.015?'✓ prix moyen':'⚠ prix moyen');
+    const form=i.fHP?`${f(i.fHP.a,2)} + ${f(i.fHP.b,3)} × ${esc(i.fHP.idx)}`+(i.fHC&&i.fHC!==i.fHP?`<br/>HC ${f(i.fHC.a,2)} + ${f(i.fHC.b,3)} ×`:''):'—';
+    return `<tr><td><b>${esc(i.supplier)}</b><br/><span style="color:var(--g400)">${INV_DOC[i.docType]||i.docType}${i.ocr?' · OCR':''}</span></td>
+      <td>${i.start?i.start.toLocaleDateString('fr-BE'):'—'}<br/>→ ${i.end?i.end.toLocaleDateString('fr-BE'):'—'}</td>
+      <td style="font-size:.6rem">${i.eans.map(e=>e.slice(-6)).join('<br/>')||'—'}</td>
+      <td>${f(i.kwhHP!=null?i.kwhHP/1000:null,2)}</td><td>${f(i.kwhHC!=null?i.kwhHC/1000:null,2)}</td><td>${f(i.pMax,0)}</td>
+      <td>${f(i.prixHP)}</td><td>${f(i.prixHC)}</td><td>${form}</td><td>${f(i.indexValue,2)}${i.indexDerived?'*':''}</td>
+      <td>${f(u.network)}</td><td>${f(u.capacity)}</td><td>${f(u.tax!=null?u.tax+u.green+(u.losses||0):null)}</td><td><b>${f(u.allIn)}</b></td><td>${f(i.totalHT,2)}</td>
+      <td style="font-size:.6rem;white-space:normal;min-width:90px">${chk.join('<br/>')||'—'}</td></tr>`;}).join('');
+  const det=I.map(i=>{
+    const g=INV_CAT.map(([c,l])=>{const it=i.items.filter(x=>x.cat===c);if(!it.length)return '';
+      return `<tr><td colspan="4" style="background:var(--g100);font-weight:700">${l} · ${fE(it.reduce((a,x)=>a+x.amount,0),2)}</td></tr>`+
+        it.map(x=>`<tr><td>${esc(x.label)}</td><td>${x.qty!=null?fmt(x.qty,2)+' '+x.qUnit:''}</td><td>${x.price!=null?fmt(x.price,x.price<1?5:2)+' '+(x.pUnit||''):''}</td><td>${fE(x.amount,2)}</td></tr>`).join('');}).join('');
+    const cap=i.capTariffs.length?`<div style="margin-top:4px">Tarifs de puissance : ${i.capTariffs.map(c=>`${esc(c.label)} ${fmt(c.kW,1)} kW → ${fmt(c.perMonth,2)} €/kW/mois${c.shaveable?' <b>(pointe, réductible par la batterie)</b>':' (fixe)'}`).join(' · ')}</div>`:'';
+    return `<details style="margin-top:6px"><summary style="cursor:pointer;font-size:.72rem"><b>${esc(i.file)}</b> · ${esc(i.client||'client non lu')} · ${esc(i.site||'site non lu')}${i.replaced?` · remplace ${esc(i.replaced)}`:''}</summary>
+      <div style="font-size:.68rem;padding:6px 4px">
+      <div>Fournisseur ${esc(i.supplier)} · GRD ${esc(i.grd||'—')} · ${INV_DOC[i.docType]||''} · ${i.days||'—'} jours · Pmax HP ${f(i.pHP,1)} / HC ${f(i.pHC,1)} kW · puissance contractuelle ${f(i.pContract,1)} kW · cos φ ${f(i.cosphi,3)}
+      · consommation annuelle : ${i.annualMWh!=null?'<b>'+fmt(i.annualMWh,1)+' MWh</b> ('+i.annualSrc+')':'non indiquée'}</div>${cap}
+      ${i.warnings.length?`<div class="ib warn" style="margin-top:4px;font-size:.66rem">${i.warnings.map(esc).join('<br/>')}</div>`:''}
+      ${i.items.length?`<table style="margin-top:4px"><thead><tr><th>Poste</th><th>Quantité</th><th>Prix unitaire</th><th>Montant HTVA</th></tr></thead><tbody>${g}</tbody></table>`:''}
+      </div></details>`;}).join('');
+  const sel2=selectedInvoices().filter(i=>i.usable);
+  const annual=sel2.filter(i=>i.annualMWh!=null).slice(-1)[0];
+  const meterNow=sel.value+'|'+sel2.length;
+  if(annual)el('inv-annual').value=+annual.annualMWh.toFixed(1);
+  else if(S._invMeter!==meterNow)el('inv-annual').value=''; // jamais la valeur d'un autre compteur
+  S._invMeter=meterNow;
+  const covered=sel2.reduce((a,i)=>a+(i.days||0),0);
+  el('invoice-table').innerHTML=`<table><thead><tr><th>Fournisseur</th><th>Période</th><th>EAN</th><th>HP MWh</th><th>HC MWh</th><th>Pmax kW</th><th>Énergie HP €/MWh</th><th>Énergie HC €/MWh</th><th>Formule (€/MWh)</th><th>Index</th><th>Réseau €/MWh</th><th>Puissance €/MWh</th><th>Taxes + verts €/MWh</th><th>Tout compris €/MWh</th><th>Total HTVA €</th><th>Contrôles</th></tr></thead><tbody>${rows}</tbody></table>
+    <div style="font-size:.62rem;color:var(--g400);margin-top:3px">* index déduit du prix facturé et de la formule. « Puissance » = termes en €/kW rapportés au MWh consommé.</div>
+    ${det}
+    <div class="ib" style="margin-top:6px;font-size:.68rem">${sel2.length} facture(s) avec volumes, couvrant ${covered} jours.
+     Consommation annuelle : ${annual?`<b>${fmt(annual.annualMWh,1)} MWh</b>, ${annual.annualSrc} (${esc(annual.file)})`:`<b>non indiquée sur les factures</b>. Une facture mensuelle ne permet pas de la déduire : saisissez-la (relevé GRD, contrat) si moins de 12 mois sont couverts.`}
+     ${errs&&errs.length?'<br/>⚠️ Non lus : '+errs.map(esc).join(', '):''}</div>`;
+}
+// Jours de l'année du profil couverts par la période d'une facture (mapping mois/jour, l'année peut différer)
+function periodSlots(shape,inv){
+  if(!inv.start||!inv.end)return [];
+  const endEx=(inv.end.getDate()===1&&(inv.days||0)>25)?inv.end:new Date(inv.end.getFullYear(),inv.end.getMonth(),inv.end.getDate()+1);
+  const out=[];
+  shape.forEach((s,j)=>{let d=new Date(inv.start.getFullYear(),s.ts.getMonth(),s.ts.getDate());if(d<inv.start)d=new Date(d.getFullYear()+1,d.getMonth(),d.getDate());if(d<endEx)out.push(j);});
+  return out;
 }
 function generateConsoFromInvoices(){
-  const I=S.invoices;if(!I.length){alert('Aucune facture importée.');return;}
+  const I=selectedInvoices().filter(i=>i.usable);
+  if(!I.length){alert('Aucune facture avec des volumes en kWh (les factures d\'acompte ne contiennent pas de volumes).');return;}
+  if(new Set(I.map(i=>i.eans[0])).size>1&&!confirm('Les factures concernent plusieurs compteurs (EAN). Les additionner sur un même profil ?'))return;
   const type=el('inv-prof-type').value,year=parseInt(el('inv-year').value)||2025;
-  const shape=buildProfileShape(type,year);
-  const vals=shape.map(s=>s.w);
-  const byMonth={};I.forEach(i=>{byMonth[i.start.getMonth()]=i;}); // mapping par mois calendaire
-  const idx=Array.from({length:12},()=>({hp:[],hc:[],all:[]}));
-  shape.forEach((s,j)=>{const m=s.ts.getMonth();const hp=isHP(s.ts.getHours(),s.ts.getDay());idx[m][hp?'hp':'hc'].push(j);idx[m].all.push(j);});
+  const shape=buildProfileShape(type,year);const vals=shape.map(s=>s.w);
+  const hpOf=j=>isHP(shape[j].ts.getHours(),shape[j].ts.getDay());
   const sumIdx=a=>a.reduce((x,j)=>x+vals[j],0);
-  const scaleTo=(a,kwh)=>{const w=sumIdx(a)*0.25;if(w>0)a.forEach(j=>vals[j]*=kwh/w);};
+  const scaleTo=(a,kwh)=>{const w=sumIdx(a)*0.25;if(w>0&&kwh!=null)a.forEach(j=>vals[j]*=kwh/w);};
   const peakCal=(a,p)=>{if(!p||!a.length)return;const v=calibratePeak(a.map(j=>vals[j]),p);a.forEach((j,k)=>vals[j]=v[k]);};
-  // 1) mois facturés : énergie HP/HC + pointes HP/HC
-  let known=0;const ratios=[];
-  for(let m=0;m<12;m++){const inv=byMonth[m];if(!inv)continue;
-    scaleTo(idx[m].hp,(inv.eHP||0)*1000);scaleTo(idx[m].hc,(inv.eHC||0)*1000);
-    const meanHP=inv.eHP*1000/(idx[m].hp.length*0.25);
-    peakCal(idx[m].hp,inv.pHP);peakCal(idx[m].hc,inv.pHC);
-    if(inv.pHP&&meanHP>0)ratios.push(inv.pHP/meanHP);
-    known+=inv.eTot*1000;}
-  // 2) mois manquants : reste de la conso annuelle, réparti selon la saisonnalité du profil
-  const missing=[...Array(12).keys()].filter(m=>!byMonth[m]);
-  if(missing.length){
-    const annual=getV('inv-annual')*1000;
-    const wMiss=missing.map(m=>sumIdx(idx[m].all));
-    let rest=annual-known;
-    if(!(annual>0)||rest<=0){ // estimation : énergie moyenne des mois connus par unité de forme
-      const knownM=[...Array(12).keys()].filter(m=>byMonth[m]);
-      const shapeKnown=knownM.reduce((a,m)=>a+sumIdx(idx[m].all),0);
-      rest=shapeKnown>0?known/shapeKnown*wMiss.reduce((a,b)=>a+b,0):0;
+  const covered=new Uint8Array(shape.length);let known=0;const ratios=[];
+  I.forEach(inv=>{
+    const sl=periodSlots(shape,inv).filter(j=>!covered[j]);if(!sl.length)return;
+    const hp=sl.filter(hpOf),hc=sl.filter(j=>!hpOf(j));
+    if(inv.kwhHP!=null&&inv.kwhHC!=null){scaleTo(hp,inv.kwhHP);scaleTo(hc,inv.kwhHC);}else scaleTo(sl,inv.kwh);
+    const meanHP=hp.length?sumIdx(hp)/hp.length:0;
+    if((inv.days||31)<=35){
+      if(inv.pHP)peakCal(hp,inv.pHP);else if(inv.pMax)peakCal(sl,inv.pMax);
+      if(inv.pHC)peakCal(hc,inv.pHC);
+      if((inv.pHP||inv.pMax)&&meanHP>0)ratios.push((inv.pHP||inv.pMax)/meanHP);
     }
-    const wT=wMiss.reduce((a,b)=>a+b,0);
-    const ratio=ratios.length?ratios.reduce((a,b)=>a+b,0)/ratios.length:null;
-    missing.forEach((m,k)=>{const e=rest*wMiss[k]/wT;scaleTo(idx[m].all,e);
-      if(ratio){const hpE=sumIdx(idx[m].hp)*0.25,meanHP=hpE/(idx[m].hp.length*0.25);peakCal(idx[m].hp,ratio*meanHP);}});
+    sl.forEach(j=>covered[j]=1);known+=inv.kwh;});
+  const miss=[];covered.forEach((c,j)=>{if(!c)miss.push(j);});
+  if(miss.length){
+    const annual=getV('inv-annual')*1000;
+    if(!(annual>0)){alert(`Les factures couvrent ${Math.round((shape.length-miss.length)/96)} jours sur ${Math.round(shape.length/96)}.\nUne facture mensuelle ne permet pas de déduire la consommation annuelle : indiquez-la dans « Consommation annuelle retenue » (relevé du GRD, contrat, historique).`);return;}
+    const rest=annual-known;
+    if(rest<=0){alert('La consommation annuelle saisie est inférieure à la somme des factures importées.');return;}
+    scaleTo(miss,rest);
+    if(ratios.length){const r=ratios.reduce((a,b)=>a+b,0)/ratios.length;
+      for(let m=0;m<12;m++){const hp=miss.filter(j=>shape[j].ts.getMonth()===m&&hpOf(j));if(hp.length)peakCal(hp,r*sumIdx(hp)/hp.length);}}
   }
+  const dCov=Math.round((shape.length-miss.length)/96);
   setConsoGenerated(shape.map((s,j)=>({ts:s.ts,cons:vals[j],inj:0})),`${I.length} facture(s) + profil ${LOAD_PROFILES[type].label}`,
-    `<div class="chip"><div class="chip-l">Mois facturés / estimés</div><div class="chip-v">${12-missing.length} / ${missing.length}</div></div>`);
+    `<div class="chip"><div class="chip-l">Jours facturés / complétés</div><div class="chip-v">${dCov} / ${Math.round(miss.length/96)}</div></div>`);
 }
 function applyInvoiceToContract(){
-  const I=S.invoices.filter(i=>i.eTot>0);if(!I.length)return;
+  const I=selectedInvoices().filter(i=>i.usable);
+  if(!I.length){alert('Aucune facture avec des volumes : les prix unitaires ne peuvent pas être calculés (factures d\'acompte ou montants globaux uniquement).');return;}
   const last=I[I.length-1],E=I.reduce((a,i)=>a+i.eTot,0);
   const wavg=k=>I.reduce((a,i)=>a+(i[k]||0)*i.eTot,0)/E;
   const set=(id,v)=>{if(v!=null&&!isNaN(v))el(id).value=+(+v).toFixed(3);};
-  set('p-idx-a-hp',last.aHP);set('p-idx-b-hp',last.bHP);set('p-idx-a-hc',last.aHC);set('p-idx-b-hc',last.bHC);
-  const idxs=I.filter(i=>i.index!=null);set('p-idx-value',idxs.length?idxs.reduce((a,i)=>a+i.index,0)/idxs.length:null);
-  set('p-idx-reseau',wavg('reseauMWh'));set('p-idx-autres',wavg('autresMWh'));
-  el('p-idx-source').value='fixed';
-  document.querySelector('#prix-type-pills .tpill[data-type="index"]').click();
-  updateIdxPreview();
-  alert(`Formule appliquée au contrat énergie (onglet Contrat énergie & Prix) :\nHP = ${fmt(last.aHP,2)} + ${fmt(last.bHP,3)} × ${last.indexName||'Index'}\nHC = ${fmt(last.aHC,2)} + ${fmt(last.bHC,3)} × ${last.indexName||'Index'}\nIndex moyen ${fmt(getV('p-idx-value'),2)} €/MWh · Réseau ${fmt(getV('p-idx-reseau'),1)} €/MWh · Autres ${fmt(getV('p-idx-autres'),1)} €/MWh`);
+  const res=wavg('reseauMWh'),aut=wavg('autresMWh');const msg=[];
+  const withF=I.filter(i=>i.fHP);
+  if(withF.length){const L=withF[withF.length-1];
+    set('p-idx-a-hp',L.aHP);set('p-idx-b-hp',L.bHP);set('p-idx-a-hc',L.aHC);set('p-idx-b-hc',L.bHC);
+    const idxs=withF.filter(i=>i.index!=null);set('p-idx-value',idxs.length?idxs.reduce((a,i)=>a+i.index,0)/idxs.length:null);
+    set('p-idx-reseau',res);set('p-idx-autres',aut);el('p-idx-source').value='fixed';
+    document.querySelector('#prix-type-pills .tpill[data-type="index"]').click();updateIdxPreview();
+    msg.push(`Contrat indexé : HP = ${fmt(L.aHP,2)} + ${fmt(L.bHP,3)} × ${L.indexName}, HC = ${fmt(L.aHC,2)} + ${fmt(L.bHC,3)} × ${L.indexName}`,`Index moyen ${fmt(getV('p-idx-value'),2)} €/MWh · réseau ${fmt(res,1)} €/MWh · taxes et autres ${fmt(aut,1)} €/MWh`);
+    if(withF.some(i=>i.formulaCheck!=null&&Math.abs(i.formulaCheck)>0.02))msg.push('⚠ La formule ne redonne pas le prix facturé sur au moins une facture : vérifiez les paramètres.');
+  } else {
+    const hp=I.filter(i=>i.prixHP!=null),hc=I.filter(i=>i.prixHC!=null);
+    const av=(arr,k)=>arr.reduce((a,i)=>a+i[k]*i.eTot,0)/arr.reduce((a,i)=>a+i.eTot,0);
+    if(!hp.length){alert('Aucun prix unitaire de l\'énergie trouvé sur ces factures.');return;}
+    const pHP=av(hp,'prixHP'),pHC=hc.length?av(hc,'prixHC'):pHP;
+    set('p-offtake-hp',pHP+res+aut);set('p-offtake-hc',pHC+res+aut);
+    document.querySelector('#prix-type-pills .tpill[data-type="tou"]').click();
+    msg.push(`Contrat HP/HC tout compris : HP ${fmt(pHP+res+aut,1)} €/MWh, HC ${fmt(pHC+res+aut,1)} €/MWh`,`(énergie ${fmt(pHP,1)} / ${fmt(pHC,1)} + réseau ${fmt(res,1)} + taxes et autres ${fmt(aut,1)} €/MWh)`);
+  }
+  const pk=I.filter(i=>i.peakTariffMonth);
+  if(pk.length){const v=pk.reduce((a,i)=>a+i.peakTariffMonth,0)/pk.length;set('p-monthly-peak',v);msg.push(`Tarif de pointe mensuelle : ${fmt(v,2)} €/kW/mois (repris de la facture)`);}
+  else msg.push('Tarif de pointe : non détaillé sur ces factures, valeur actuelle conservée ('+fmt(getV('p-monthly-peak'),2)+' €/kW/mois).');
+  updateRecap();
+  alert('Appliqué au contrat énergie :\n'+msg.join('\n'));
 }
+
 function updateIdxPreview(){
   if(!el('idx-preview'))return;
   const i=getV('p-idx-value'),sur=getV('p-idx-reseau')+getV('p-idx-autres');
