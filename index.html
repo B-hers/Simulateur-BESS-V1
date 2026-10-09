@@ -538,6 +538,32 @@ details summary{color:var(--ink)}
 .rp-tbl tr.neg td{color:#A8402F}.rp-note{background:#F7F7F2}
 .rp-alloc{font-family:inherit;gap:.6mm}.rp-alloc div{border-radius:1mm}
 .rp-foot{color:#8F968F;border-top:.3mm solid #E7E6DD}
+
+/* ── Guide par étape : bouton « ? » et bulle ── */
+.steps li{position:relative;display:flex;align-items:center}
+.steps li .step{flex:1;min-width:0;padding-right:38px}
+.help-btn{width:22px;height:22px;border-radius:50%;border:1.5px solid var(--line2);background:#fff;color:var(--deep);font:600 .78rem/1 inherit;font-family:inherit;display:inline-grid;place-items:center;cursor:help;flex-shrink:0;padding:0;transition:background .12s,border-color .12s,color .12s,opacity .12s}
+.help-btn:hover,.help-btn[aria-expanded="true"]{background:var(--deep);border-color:var(--deep);color:#fff}
+.help-btn:focus-visible{outline:2px solid var(--deep);outline-offset:2px}
+.help-side{position:absolute;right:9px;top:50%;transform:translateY(-50%);width:20px;height:20px;font-size:.72rem;opacity:.8}
+.steps li:hover .help-side,.help-side:focus-visible,.help-side[aria-expanded="true"],.step.active+.help-side{opacity:1}
+.top-h{display:flex;align-items:center;gap:10px}
+.help-pop{position:fixed;z-index:400;left:0;top:0;width:min(400px,calc(100vw - 24px));overflow-y:auto;background:#fff;border:1px solid var(--line2);border-radius:16px;box-shadow:0 18px 48px rgba(31,41,37,.16),0 2px 6px rgba(31,41,37,.06);padding:18px 20px 16px;color:var(--ink);font-size:.86rem;line-height:1.5}
+.help-pop[hidden]{display:none}
+.hp-head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:8px}
+.hp-step{display:block;font-size:.74rem;font-weight:600;color:var(--deep);margin-bottom:2px}
+.help-pop h3{font-size:1.06rem;font-weight:600;letter-spacing:-.012em;line-height:1.2;margin:0}
+.hp-close{display:none;border:1px solid var(--line2);background:#fff;color:#55615A;border-radius:999px;font:500 .74rem/1 inherit;font-family:inherit;padding:6px 10px;cursor:pointer;flex-shrink:0}
+.hp-close:hover{background:var(--mint)}
+.help-pop.pinned .hp-close{display:block}
+.hp-but{color:#3F4A44;margin:0 0 4px}
+.help-pop h4{font-size:.8rem;font-weight:600;color:var(--deep);margin:13px 0 5px;letter-spacing:0;text-transform:none}
+.help-pop ul,.help-pop ol{margin:0;padding-left:18px;display:flex;flex-direction:column;gap:4px}
+.help-pop li{color:#3F4A44}
+.help-pop li::marker{color:var(--sage)}
+.help-pop ol li::marker{color:var(--deep);font-weight:600}
+@media(max-width:920px){.help-side{display:none}.steps li .step{padding-right:12px}}
+body.rp-printing .help-pop{display:none!important}
 main [style*="grid-template-columns:1fr 1fr"]{grid-template-columns:minmax(0,1fr) minmax(0,1fr)!important}
 .g2{grid-template-columns:repeat(2,minmax(0,1fr))}.g3{grid-template-columns:repeat(3,minmax(0,1fr))}.g4{grid-template-columns:repeat(4,minmax(0,1fr))}
 @media(max-width:1180px){main [style*="grid-template-columns:1fr 1fr"]{grid-template-columns:minmax(0,1fr)!important}.g4{grid-template-columns:repeat(2,minmax(0,1fr))}.kg{grid-template-columns:repeat(3,minmax(0,1fr))}.scen-compare{grid-template-columns:1fr}}
@@ -545,11 +571,12 @@ main [style*="grid-template-columns:1fr 1fr"]{grid-template-columns:minmax(0,1fr
 </style>
 </head>
 <body>
+<div id="help-pop" class="help-pop" role="region" aria-label="Guide de l'étape" hidden></div>
 <div class="app">
 <aside class="side">
   <button class="brand" onclick="goStep('home')" title="Présentation"><svg width="30" height="30" viewBox="0 0 30 30" aria-hidden="true"><rect width="30" height="30" rx="9" fill="#DCE9DF"/><rect x="7" y="8" width="16" height="3.2" rx="1.6" fill="#5E7768"/><rect x="7" y="13.4" width="11" height="3.2" rx="1.6" fill="#5E7768"/><rect x="7" y="18.8" width="6" height="3.2" rx="1.6" fill="#5E7768"/></svg><span>BESS Studio</span></button>
   <div class="side-cap">Votre étude, étape par étape</div>
-  <ol class="steps"><li><button class="step" data-step="conso"><span class="n"><span>1</span><svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 6.3l2.3 2.3 4.7-5"/></svg></span>Consommation</button></li><li><button class="step" data-step="prix"><span class="n"><span>2</span><svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 6.3l2.3 2.3 4.7-5"/></svg></span>Contrat d'énergie</button></li><li><button class="step" data-step="pv"><span class="n"><span>3</span><svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 6.3l2.3 2.3 4.7-5"/></svg></span>Production solaire</button></li><li><button class="step" data-step="batt"><span class="n"><span>4</span><svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 6.3l2.3 2.3 4.7-5"/></svg></span>Batterie et site</button></li><li><button class="step" data-step="scen"><span class="n"><span>5</span><svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 6.3l2.3 2.3 4.7-5"/></svg></span>Marchés et scénarios</button></li><li><button class="step" data-step="fin"><span class="n"><span>6</span><svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 6.3l2.3 2.3 4.7-5"/></svg></span>Financement</button></li><li><button class="step" data-step="res"><span class="n"><span>7</span><svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 6.3l2.3 2.3 4.7-5"/></svg></span>Résultats</button></li></ol>
+  <ol class="steps"><li><button class="step" data-step="conso"><span class="n"><span>1</span><svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 6.3l2.3 2.3 4.7-5"/></svg></span>Consommation</button><button type="button" class="help-btn help-side" data-help="conso" aria-label="Aide : Consommation" aria-expanded="false" aria-controls="help-pop">?</button></li><li><button class="step" data-step="prix"><span class="n"><span>2</span><svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 6.3l2.3 2.3 4.7-5"/></svg></span>Contrat d'énergie</button><button type="button" class="help-btn help-side" data-help="prix" aria-label="Aide : Contrat d'énergie" aria-expanded="false" aria-controls="help-pop">?</button></li><li><button class="step" data-step="pv"><span class="n"><span>3</span><svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 6.3l2.3 2.3 4.7-5"/></svg></span>Production solaire</button><button type="button" class="help-btn help-side" data-help="pv" aria-label="Aide : Production solaire" aria-expanded="false" aria-controls="help-pop">?</button></li><li><button class="step" data-step="size"><span class="n"><span>4</span><svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 6.3l2.3 2.3 4.7-5"/></svg></span>Dimensionnement optimal</button><button type="button" class="help-btn help-side" data-help="size" aria-label="Aide : Dimensionnement optimal" aria-expanded="false" aria-controls="help-pop">?</button></li><li><button class="step" data-step="batt"><span class="n"><span>5</span><svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 6.3l2.3 2.3 4.7-5"/></svg></span>Choix batterie et site</button><button type="button" class="help-btn help-side" data-help="batt" aria-label="Aide : Choix batterie et site" aria-expanded="false" aria-controls="help-pop">?</button></li><li><button class="step" data-step="scen"><span class="n"><span>6</span><svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 6.3l2.3 2.3 4.7-5"/></svg></span>Marchés et scénarios</button><button type="button" class="help-btn help-side" data-help="scen" aria-label="Aide : Marchés et scénarios" aria-expanded="false" aria-controls="help-pop">?</button></li><li><button class="step" data-step="fin"><span class="n"><span>7</span><svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 6.3l2.3 2.3 4.7-5"/></svg></span>Financement</button><button type="button" class="help-btn help-side" data-help="fin" aria-label="Aide : Financement" aria-expanded="false" aria-controls="help-pop">?</button></li><li><button class="step" data-step="res"><span class="n"><span>8</span><svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 6.3l2.3 2.3 4.7-5"/></svg></span>Résultats</button><button type="button" class="help-btn help-side" data-help="res" aria-label="Aide : Résultats" aria-expanded="false" aria-controls="help-pop">?</button></li></ol>
   <div class="side-foot">
     <p class="side-status" id="side-status"></p>
     <button class="btn btn-primary side-run" onclick="runSimulation()">Lancer la simulation</button>
@@ -557,14 +584,15 @@ main [style*="grid-template-columns:1fr 1fr"]{grid-template-columns:minmax(0,1fr
 </aside>
 <div class="main-col">
 <div class="topbar" id="topbar">
-  <div><h1 id="top-title"></h1><p id="top-sub"></p></div>
+  <div><div class="top-h"><h1 id="top-title"></h1><button type="button" class="help-btn" id="top-help" data-help="" aria-label="Aide sur cette étape" aria-expanded="false" aria-controls="help-pop">?</button></div><p id="top-sub"></p></div>
   <button class="btn btn-ghost" id="top-next" onclick="nextStep()"></button>
 </div>
 <div class="nav">
   <div class="nav-inner">
     <div class="ntab active" data-tab="t0">Présentation</div>
     <div class="ntab" data-tab="t1">Données <span class="badge" id="badge-data">0/3</span></div>
-    <div class="ntab" data-tab="t2">Batterie & Site</div>
+    <div class="ntab" data-tab="t6">Dimensionnement</div>
+    <div class="ntab" data-tab="t2">Choix batterie & site</div>
     <div class="ntab" data-tab="t3">Scénarios Revenus</div>
     <div class="ntab" data-tab="t4">Financement</div>
     <div class="ntab" data-tab="t5">Résultats <span class="badge" id="badge-res">–</span></div>
@@ -729,6 +757,24 @@ main [style*="grid-template-columns:1fr 1fr"]{grid-template-columns:minmax(0,1fr
         </div>
       </div>
     </div>
+    <div class="card" style="margin-top:14px">
+      <div class="ch"><div class="ico"></div><h2>Projets futurs</h2></div>
+      <div class="cb">
+        <div class="ib" style="margin-bottom:8px">Pour dimensionner la batterie sur la consommation de demain : bornes de recharge et croissance. Laisser à 0 pour ignorer.</div>
+        <div class="g2">
+          <div class="f"><label>Croissance de la consommation</label><div class="ir"><input type="number" id="proj-growth" value="0" min="-50" max="200" step="1"/><div class="iu">%</div></div></div>
+          <div class="f" style="grid-column:1/-1"><label style="display:flex;align-items:center;gap:8px;cursor:pointer"><input type="checkbox" id="proj-ev-on" onchange="el('proj-ev-fields').style.display=this.checked?'grid':'none'"/> Ajouter des bornes de recharge futures</label></div>
+          <div id="proj-ev-fields" style="display:none;grid-column:1/-1;grid-template-columns:1fr 1fr;gap:10px">
+          <div class="f"><label>Bornes de recharge VE : nombre</label><div class="ir"><input type="number" id="proj-ev-n" value="2" min="0" max="200" step="1"/><div class="iu">bornes</div></div></div>
+          <div class="f"><label>Puissance par borne</label><div class="ir"><input type="number" id="proj-ev-kw" value="22" min="3" max="350" step="1"/><div class="iu">kW</div></div></div>
+          <div class="f"><label>Taux d'utilisation dans la plage</label><div class="ir"><input type="number" id="proj-ev-use" value="25" min="1" max="100" step="1"/><div class="iu">%</div></div></div>
+          <div class="f"><label>Plage de recharge : début</label><div class="ir"><input type="number" id="proj-ev-h1" value="8" min="0" max="23" step="1"/><div class="iu">h</div></div></div>
+          <div class="f"><label>Plage de recharge : fin</label><div class="ir"><input type="number" id="proj-ev-h2" value="18" min="1" max="24" step="1"/><div class="iu">h</div></div></div>
+          <div class="f"><label>Jours de recharge</label><select id="proj-ev-days"><option value="all">Tous les jours</option><option value="wd">Jours ouvrés</option></select></div>
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
 
   <!-- ─── SUB 2: PRIX ÉNERGIE ─── -->
@@ -745,7 +791,7 @@ main [style*="grid-template-columns:1fr 1fr"]{grid-template-columns:minmax(0,1fr
 
         <!-- HP/HC -->
         <div id="prix-tou" class="prix-panel">
-          <div class="ib" style="margin-bottom:10px">Les tarifs HP/HC sont définis dans l'onglet <strong>Batterie & Site</strong>. Ils seront utilisés directement pour le calcul des revenus.</div>
+          <div class="ib" style="margin-bottom:10px">Les tarifs HP/HC sont définis dans l'onglet <strong>Choix batterie & site</strong>. Ils seront utilisés directement pour le calcul des revenus.</div>
           <div class="g2">
             <div class="f"><label>Tarif HP (Heures Pleines)</label><div class="ir"><input type="number" id="p-offtake-hp" value="290" min="0" max="1000" step="1"/><div class="iu">€/MWh</div></div></div>
             <div class="f"><label>Tarif HC (Heures Creuses)</label><div class="ir"><input type="number" id="p-offtake-hc" value="200" min="0" max="1000" step="1"/><div class="iu">€/MWh</div></div></div>
@@ -959,12 +1005,28 @@ main [style*="grid-template-columns:1fr 1fr"]{grid-template-columns:minmax(0,1fr
 </div>
 
 <!-- ═══ TAB 2: BATTERIE & SITE ═══ -->
+<!-- ═══ TAB 6: DIMENSIONNEMENT OPTIMAL ═══ -->
+<div class="tab-section" id="t6">
+  <div class="card">
+    <div class="ch"><div class="ico"></div><h2>Dimensionnement optimal de la batterie</h2></div>
+    <div class="cb">
+      <div class="ib" style="margin-bottom:10px">Cherche le modèle de batterie et le nombre de modules qui donnent la meilleure valeur actuelle nette. Le calcul utilise la consommation, le contrat et le solaire saisis, ainsi que les parts de services réseau, les prix du scénario Base et les coûts de l'étape Financement. Modèles testés (environ 2 h) : 25 kW / 50 kWh, 50 kW / 100 kWh, 100 kW / 233 kWh et 125 kW / 261 kWh, seuls ou en multiples, dans la limite de la puissance de raccordement.</div>
+      <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><button class="btn btn-green" id="btn-size" onclick="runSizing()">Chercher la taille optimale</button><span style="font-size:.84rem;color:var(--g400)">Aucune simulation complète n'est nécessaire. Le résultat peut être appliqué à l'étape suivante.</span></div>
+      <div id="res-size" style="margin-top:10px"></div>
+    </div>
+  </div>
+</div>
+
 <div class="tab-section" id="t2">
   <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
     <div>
       <div class="card">
         <div class="ch"><div class="ico"></div><h2>Configuration Batterie</h2></div>
         <div class="cb">
+          <div class="g2" style="margin-bottom:8px">
+            <div class="f"><label>Modèle de batterie</label><select id="batt-model"><option value="">Personnalisé</option></select></div>
+            <div class="f"><label>Nombre de modules</label><div class="ir"><input type="number" id="batt-qty" value="1" min="1" max="20" step="1"/><div class="iu">×</div></div></div>
+          </div>
           <div class="g2">
             <div class="f"><label>Capacité nominale</label><div class="ir"><input type="number" id="batt-cap" value="215" min="1" max="10000" step="1"/><div class="iu">kWh</div></div></div>
             <div class="f"><label>Puissance nominale</label><div class="ir"><input type="number" id="batt-pow" value="100" min="1" max="5000" step="1"/><div class="iu">kW</div></div></div>
@@ -990,6 +1052,9 @@ main [style*="grid-template-columns:1fr 1fr"]{grid-template-columns:minmax(0,1fr
           </div>
           <div class="f"><label>Seuil peak shaving <span class="h">(% du pic historique max)</span></label>
             <div class="ir"><input type="number" id="peak-thr-pct" value="80" min="30" max="100" step="1"/><div class="iu">%</div></div>
+          </div>
+          <div class="f"><label>Énergie gardée pour la pointe <span class="h">(mode combiné : l'autoconsommation ne vide pas la batterie sous ce niveau, % de la plage utile)</span></label>
+            <div class="ir"><input type="number" id="peak-reserve" value="50" min="0" max="90" step="5"/><div class="iu">%</div></div>
           </div>
           <div class="f"><label>Réserve d'énergie FCR / aFRR <span class="h">(durée à pleine puissance réservée, dans chaque sens)</span></label><div class="ir"><input type="number" id="res-dur" value="0.25" min="0" max="2" step="0.05"/><div class="iu">h</div></div></div>
           <div class="f"><label>Cycles maximum par jour <span class="h">(garantie constructeur, tous usages confondus)</span></label><div class="ir"><input type="number" id="max-cycles" value="1.5" min="0.1" max="4" step="0.1"/><div class="iu">cycles/jour</div></div></div>
@@ -1324,7 +1389,11 @@ main [style*="grid-template-columns:1fr 1fr"]{grid-template-columns:minmax(0,1fr
         <div class="ch"><div class="ico"></div><h2>CAPEX & OPEX</h2></div>
         <div class="cb">
           <div class="g2">
-            <div class="f"><label>CAPEX Batterie</label><div class="ir"><input type="number" id="fin-capex-batt" value="44075" step="100"/><div class="iu">€</div></div></div>
+            <div class="f" style="grid-column:1/-1"><label style="display:flex;align-items:center;gap:8px;cursor:pointer"><input type="checkbox" id="fin-capex-auto" checked/> Calculer le coût de la batterie selon sa capacité (prix dégressif)</label></div>
+            <div class="f"><label>Prix jusqu'au seuil</label><div class="ir"><input type="number" id="fin-price-t1" value="300" min="0" step="5"/><div class="iu">€/kWh</div></div></div>
+            <div class="f"><label>Seuil de capacité</label><div class="ir"><input type="number" id="fin-price-thr" value="270" min="0" step="10"/><div class="iu">kWh</div></div></div>
+            <div class="f"><label>Prix au-delà du seuil</label><div class="ir"><input type="number" id="fin-price-t2" value="240" min="0" step="5"/><div class="iu">€/kWh</div></div></div>
+            <div class="f"><label>CAPEX Batterie <span class="h">(calculé si la case est cochée)</span></label><div class="ir"><input type="number" id="fin-capex-batt" value="44075" step="100"/><div class="iu">€</div></div></div>
             <div class="f"><label>CAPEX Installation</label><div class="ir"><input type="number" id="fin-capex-install" value="5000" step="100"/><div class="iu">€</div></div></div>
             <div class="f"><label>Provision recyclage</label><div class="ir"><input type="number" id="fin-capex-recycle" value="4400" step="100"/><div class="iu">€</div></div></div>
             <div class="f"><label>Subside / déduction</label><div class="ir"><input type="number" id="fin-capex-subsidy" value="0" step="100"/><div class="iu">€</div></div></div>
@@ -1423,8 +1492,21 @@ main [style*="grid-template-columns:1fr 1fr"]{grid-template-columns:minmax(0,1fr
       <div class="card"><div class="ch"><div class="ico"></div><h2>Sans batterie</h2></div><div class="cb" id="res-before"></div></div>
       <div class="card"><div class="ch"><div class="ico"></div><h2>Avec batterie</h2></div><div class="cb" id="res-after"></div></div>
     </div>
+    <div class="card hidden" id="res-calib-card" style="margin-bottom:14px"><div class="ch"><div class="ico"></div><h2>Calibrage sur les factures</h2></div><div class="cb" id="res-calib"></div></div>
     <div class="card" style="margin-bottom:14px"><div class="ch"><div class="ico"></div><h2>Revenus annuels du scénario Base</h2></div><div class="cb"><table class="rev-table" id="res-rev-table"></table></div></div>
     <div class="card" style="margin-bottom:14px"><div class="ch"><div class="ico"></div><h2>Comparaison scénarios</h2></div><div class="cb"><div class="scen-compare" id="res-scen-compare"></div></div></div>
+    <div class="card" style="margin-bottom:14px"><div class="ch"><div class="ico"></div><h2>Facture mensuelle avant / après batterie</h2></div><div class="cb">
+      <div style="height:230px"><canvas id="chart-bill"></canvas></div>
+      <div style="overflow-x:auto;margin-top:8px"><table class="rev-table" id="res-bill-table"></table></div>
+      <div style="font-size:.84rem;color:var(--g400);margin-top:5px">Calcul réel mois par mois, scénario Base : énergie (soutirage et injection au prix du quart d'heure) et tarif de pointe. Les revenus FCR, aFRR et imbalance viennent en plus et ne figurent pas ici.</div>
+    </div></div>
+    <div class="card" style="margin-bottom:14px"><div class="ch"><div class="ico"></div><h2>Sensibilités</h2></div><div class="cb">
+      <div id="res-sens"></div>
+    </div></div>
+    <div class="card" style="margin-bottom:14px"><div class="ch"><div class="ico"></div><h2>Comparaison des contrats d'énergie</h2></div><div class="cb">
+      <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><button class="btn btn-secondary" id="btn-contracts" onclick="compareContracts()">Comparer les contrats</button><span style="font-size:.84rem;color:var(--g400)">Même batterie, même site, scénario Base : fixe, heures pleines/creuses, indexé, dynamique (si les prix spot sont chargés).</span></div>
+      <div id="res-contracts" style="margin-top:10px"></div>
+    </div></div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px">
       <div class="card"><div class="ch"><div class="ico"></div><h2>Revenus par mois et par source</h2></div><div class="cb"><div class="cw"><canvas id="chart-monthly"></canvas></div></div></div>
       <div class="card"><div class="ch"><div class="ico"></div><h2>Une semaine de juin, au quart d'heure</h2></div><div class="cb"><div class="cw"><canvas id="chart-weekly"></canvas></div></div></div>
@@ -1444,7 +1526,7 @@ main [style*="grid-template-columns:1fr 1fr"]{grid-template-columns:minmax(0,1fr
 </div>
 
 </main>
-<footer>BESS Studio 3.0 · Résultats indicatifs, à valider avant tout engagement contractuel.</footer>
+<footer>BESS Studio 3.2 · Résultats indicatifs, à valider avant tout engagement contractuel.</footer>
 </div><!-- /main-col -->
 </div><!-- /app -->
 
@@ -1604,6 +1686,32 @@ el('fin-debt-ratio').addEventListener('input',()=>{el('fin-equity-disp').value=1
 el('fin-duration').addEventListener('input',()=>{if(el('fin-amort-years'))el('fin-amort-years').value=el('fin-duration').value;updateCapex();});
 ['p-hp-start','p-hp-end'].forEach(id=>el(id).addEventListener('input',()=>el('hp-disp').textContent=(el('p-hp-start').value||7)+'h à '+(el('p-hp-end').value||22)+'h'));
 
+
+// Catalogue de batteries (environ 2 h). Les modèles s'additionnent : n modules = n fois la puissance et la capacité.
+const BESS_CATALOG=[{p:25,c:50},{p:50,c:100},{p:100,c:233},{p:125,c:261}];
+const modLabel=m=>`${m.p} kW / ${m.c} kWh`;
+(function(){const sel=el('batt-model');if(!sel)return;
+  BESS_CATALOG.forEach((m,i)=>sel.insertAdjacentHTML('beforeend',`<option value="${i}">${modLabel(m)}</option>`));
+  const apply=()=>{const m=BESS_CATALOG[sel.value];if(!m)return;const n=Math.max(1,parseInt(el('batt-qty').value)||1);
+    el('batt-cap').value=m.c*n;el('batt-pow').value=m.p*n;el('batt-cap').dispatchEvent(new Event('input'));};
+  sel.addEventListener('change',apply);el('batt-qty').addEventListener('input',apply);
+  // une saisie manuelle de la capacité ou de la puissance repasse en « Personnalisé » si elle ne correspond plus au modèle
+  const chk=()=>{const m=BESS_CATALOG[sel.value];if(!m)return;const n=Math.max(1,parseInt(el('batt-qty').value)||1);
+    if(parseFloat(el('batt-cap').value)!==m.c*n||parseFloat(el('batt-pow').value)!==m.p*n)sel.value='';};
+  el('batt-cap').addEventListener('input',chk);el('batt-pow').addEventListener('input',chk);
+})();
+function battCost(cap){
+  const t1=getV('fin-price-t1'),thr=getV('fin-price-thr'),t2=getV('fin-price-t2');
+  return Math.min(cap,thr)*t1+Math.max(0,cap-thr)*t2;
+}
+function capexAuto(){const e=el('fin-capex-auto');return !!(e&&e.checked);}
+function syncBattCapex(){
+  const b=el('fin-capex-batt');if(!b)return;
+  b.readOnly=capexAuto();b.style.opacity=capexAuto()?'.65':'';
+  if(capexAuto())b.value=Math.round(battCost(parseFloat(el('batt-cap').value)||0));
+  updateCapex();
+}
+['fin-capex-auto','fin-price-t1','fin-price-thr','fin-price-t2','batt-cap'].forEach(id=>{const e=el(id);if(e){e.addEventListener('input',syncBattCapex);e.addEventListener('change',syncBattCapex);}});
 function updateCapex(){
   const brut=(parseFloat(el('fin-capex-batt').value)||0)+(parseFloat(el('fin-capex-install').value)||0)+(parseFloat(el('fin-capex-recycle').value)||0);
   const net=brut-(parseFloat(el('fin-capex-subsidy').value)||0);
@@ -2101,6 +2209,8 @@ function mergeData(){
   // Index PV par (mois, jour, heure, minute) : alignement calendaire en O(1) au lieu d'une recherche linéaire
   const pvMap=new Map();
   if(S.pvSlots&&S.pvMode!=='none')S.pvSlots.forEach(p=>{if(p.ts)pvMap.set(p.ts.getMonth()*1e6+p.ts.getDate()*1e4+p.ts.getHours()*100+p.ts.getMinutes(),p.pv);});
+  const projGrowth=getV('proj-growth')/100,evH1=getV('proj-ev-h1'),evH2=getV('proj-ev-h2')||24,evAll=(el('proj-ev-days')?.value||'all')==='all';
+  const evKW=el('proj-ev-on')&&el('proj-ev-on').checked?getV('proj-ev-n')*getV('proj-ev-kw')*getV('proj-ev-use')/100:0;
   const merged=consoSlots.map((s,i)=>{
     // PV : align by calendar day+time when timestamps available
     let pv=0;
@@ -2120,7 +2230,9 @@ function mergeData(){
     const month=s.ts?s.ts.getMonth():Math.floor((i/96)/30.5)%12;
     const pr=slotPrices(i,hp,month,pc);
     // price : prix offtake total du quart d'heure (€/MWh), utilisé par le dispatch (seuils d'arbitrage)
-    return {...s,pv,h,dow,hp,price:pr.pOff,pOff:pr.pOff,pInj:pr.pInj};
+    let cons=s.cons*(1+projGrowth);
+    if(evKW>0&&h>=evH1&&h<evH2&&(evAll||(dow>=1&&dow<=5)))cons+=evKW;
+    return {...s,cons,pv,h,dow,hp,price:pr.pOff,pOff:pr.pOff,pInj:pr.pInj};
   });
   S.varPrice=pc.varying; // true si le prix varie à l'intérieur de la journée au-delà du HP/HC
   return merged;
@@ -2164,33 +2276,58 @@ function runDispatch(data,battCfg,scenKey,noArb){
   }
 
   let soc=cap*(socMin+socMax)/2;
-  const peakMax=Math.max(...data.map(s=>Math.max(0,s.cons-s.pv)));
-  const peakTarget=peakMax*peakThrPct;
+  // Pointe visée par mois (le tarif de pointe se calcule par mois), plafonnée par la limite de raccordement
+  const monthOf=i=>{const t=data[i].ts;return t?t.getMonth():Math.min(11,Math.floor(i/2920));};
+  const mMax=new Array(12).fill(0);
+  for(let i=0;i<data.length;i++){const v=Math.max(0,data[i].cons-data[i].pv),m=monthOf(i);if(v>mMax[m])mMax[m]=v;}
+  const peakTargetM=mMax.map(v=>Math.min(v*peakThrPct,gridLimit));
+  const keepPct=Math.min(0.95,Math.max(0,(parseFloat(el('peak-reserve')?.value)||0)/100));
+  const keepSoc=cap*socMin+(cap*socMax-cap*socMin)*keepPct;   // niveau gardé pour la pointe
+  // Prix spot au quart d'heure : optimisation de la journée (programmation dynamique, prix connus du jour)
+  // au lieu de la règle des quartiles, qui détruisait la valeur de l'arbitrage et de l'autoconsommation.
+  if(!noArb&&S.varPrice&&(strategy==='combined'||strategy==='arbitrage')&&dispPow>0.01&&socMax>socMin+1e-6){
+    return dpDispatch(data,{cap,effC,effD,socMin,socMax,dispPow,gridLimit,peakTargetM,monthOf,lam:strategy==='combined'?PEAK_LAMBDA:0,lowP:null});
+  }
   const res=[];
 
   for(let i=0;i<data.length;i++){
     const s=data[i];
     const netLoad=s.cons-s.pv;
-    const maxCPow=Math.min(dispPow,(cap*socMax-soc)/(dt*effC));
+    const peakTarget=peakTargetM[monthOf(i)];
+    let maxCPow=Math.min(dispPow,(cap*socMax-soc)/(dt*effC));
     const maxDPow=Math.min(dispPow,(soc-cap*socMin)*effD/dt);
+    // la recharge depuis le réseau ne doit pas dépasser la limite de raccordement
+    if(netLoad>0)maxCPow=Math.max(0,Math.min(maxCPow,gridLimit-netLoad));
     let bAC=0;
 
-    if(strategy==='autoconso'||strategy==='combined'){
+    if(strategy==='peak'){
+      if(netLoad>peakTarget&&maxDPow>0.01)bAC=-Math.min(netLoad-peakTarget,maxDPow);
+      else if(netLoad<0&&maxCPow>0.01)bAC=Math.min(-netLoad,maxCPow);   // recharge sur surplus
+    } else if(strategy==='autoconso'){
       if(netLoad<0&&maxCPow>0.01)bAC=Math.min(-netLoad,maxCPow);
       else if(netLoad>0&&maxDPow>0.01&&(s.hp||soc>cap*0.6))bAC=-Math.min(netLoad,maxDPow);
+    } else if(strategy==='combined'){
+      // 1. la pointe d'abord, 2. surplus PV, 3. autoconsommation sans descendre sous l'énergie gardée pour la pointe
+      if(netLoad>peakTarget&&maxDPow>0.01)bAC=-Math.min(netLoad-peakTarget,maxDPow);
+      else if(netLoad<0&&maxCPow>0.01)bAC=Math.min(-netLoad,maxCPow);
+      else if(netLoad>0&&s.hp&&soc>keepSoc){
+        const dAvail=Math.min(dispPow,(soc-keepSoc)*effD/dt);
+        if(dAvail>0.01)bAC=-Math.min(netLoad,dAvail);
+      }
     }
-    if((strategy==='peak'||strategy==='combined')&&bAC===0){
-      const netA=netLoad+bAC;
-      if(netA>peakTarget&&maxDPow>0.01)bAC=-Math.min(netA-peakTarget,maxDPow);
-    } else if(strategy==='combined'&&bAC!==0){
-      const netA=netLoad+bAC;
-      if(netA>peakTarget&&maxDPow>0.01){const ex=Math.min(netA-peakTarget,maxDPow+bAC);bAC=-ex;}
+    // Recharge pour la pointe suivante : sans PV (ou en hiver), la batterie ne se rechargeait jamais hors arbitrage
+    if(bAC===0&&(strategy==='peak'||strategy==='combined')&&netLoad>=0&&soc<keepSoc-0.5&&maxCPow>0.01){
+      const room=peakTarget*0.6-netLoad;
+      if(room>0.01)bAC=Math.min(maxCPow,room);
     }
     if(!noArb&&(strategy==='arbitrage'||strategy==='combined')&&bAC===0){
       const th=dayThresh[Math.floor(i/96)]||{lo:Infinity,hi:-Infinity};
       const p=s.price!==null&&s.price!==undefined?s.price:(s.hp?getV('p-offtake-hp'):getV('p-offtake-hc'));
       if(p<th.lo&&maxCPow>0.01)bAC=maxCPow;
-      else if(p>th.hi&&maxDPow>0.01)bAC=-maxDPow;
+      else if(p>th.hi&&maxDPow>0.01){
+        const dA=strategy==='combined'?Math.min(maxDPow,Math.max(0,(soc-keepSoc)*effD/dt)):maxDPow;
+        if(dA>0.01)bAC=-dA;
+      }
     }
     if(bAC>0)soc+=bAC*dt*effC;
     else if(bAC<0)soc-=(-bAC)*dt/effD;
@@ -2198,6 +2335,55 @@ function runDispatch(data,battCfg,scenKey,noArb){
     res.push({...s,bAC,netGrid:netLoad+bAC,soc});
   }
   return res;
+}
+
+const PEAK_LAMBDA=0.3;   // € par kW au-dessus de la pointe visée et par quart d'heure : la pointe garde la priorité
+function dpDispatch(data,o){
+  const {cap,effC,effD,socMin,socMax,dispPow,gridLimit,peakTargetM,monthOf,lam}=o;
+  const dt=0.25,Elo=cap*socMin,Ehi=cap*socMax,band=Ehi-Elo;
+  const mx=dispPow*dt/effD;                        // énergie maximale retirée du stock par quart d'heure
+  const K=6;let N=Math.min(121,Math.max(3,Math.ceil(band/(mx/K))+1));
+  const dE=band/(N-1),KK=Math.max(1,Math.ceil(mx/dE-1e-9));
+  const WEAR=0.005;                               // 5 €/MWh de débit : évite les cycles sans valeur
+  const T=96,nDays=Math.ceil(data.length/T);
+  const V=new Float64Array(N),Vn=new Float64Array(N),dec=new Int8Array(T*N);
+  const out=new Array(data.length);
+  let iCur=Math.round(((Elo+Ehi)/2-Elo)/dE);
+  for(let d=0;d<nDays;d++){
+    const a=d*T,b=Math.min(data.length,a+T),n=b-a;
+    let pm=0;for(let t=a;t<b;t++)pm+=data[t].pOff;pm/=n;
+    const vT=pm*effD/1000;                         // valeur de l'énergie restant en fin de journée
+    for(let i=0;i<N;i++)V[i]=-(i*dE)*vT;
+    for(let t=n-1;t>=0;t--){
+      const s=data[a+t],nl=s.cons-s.pv,pO=s.pOff/1000*dt,pI=s.pInj/1000*dt,pk=peakTargetM[monthOf(a+t)];
+      const gcap=nl>0?Math.max(0,gridLimit-nl):1e9;
+      for(let i=0;i<N;i++){
+        let best=1e18,bj=0;
+        const j0=Math.max(0,i-KK),j1=Math.min(N-1,i+KK);
+        for(let j=j0;j<=j1;j++){
+          const de=(j-i)*dE;
+          const bAC=de>=0?de/(dt*effC):de*effD/dt;
+          if(bAC>dispPow+1e-9||-bAC>dispPow+1e-9)continue;
+          if(bAC>gcap+1e-9)continue;
+          const ng=nl+bAC;
+          let c=(ng>0?ng*pO:ng*pI)+WEAR*Math.abs(bAC)*dt+V[j];
+          if(lam>0&&ng>pk)c+=lam*(ng-pk);
+          if(c<best){best=c;bj=j-i;}
+        }
+        Vn[i]=best;dec[t*N+i]=bj;
+      }
+      V.set(Vn);
+    }
+    let i=iCur;
+    for(let t=0;t<n;t++){
+      const s=data[a+t],j=i+dec[t*N+i],de=(j-i)*dE;
+      const bAC=de>=0?de/(dt*effC):de*effD/dt;
+      out[a+t]={...s,bAC,netGrid:s.cons-s.pv+bAC,soc:Elo+j*dE};
+      i=j;
+    }
+    iCur=i;
+  }
+  return out;
 }
 
 // Économie sur la facture d'énergie (soutirage évité + injection supplémentaire), prix du quart d'heure
@@ -2276,7 +2462,8 @@ function calcRevenues(baseline,simFull,scenKey,simNoArb,battCfg){
   // 6) Commissions agrégateur, par source
   const aggFees=fcr*getV(k+'-fcr-agg')/100+afrr*getV(k+'-afrr-agg')/100+imbal*imbAgg;
   const A=Math.max(0,autoSav),P=Math.max(0,peakSav),R=Math.max(0,arb);
-  return {autoconso:A,peak:P,arb:R,fcr,afrr,imbal,total:A+P+R+fcr+afrr+imbal,aggFees,
+  const aggSvc=fcr*getV(k+'-fcr-agg')/100+afrr*getV(k+'-afrr-agg')/100;
+  return {autoconso:A,peak:P,arb:R,fcr,afrr,imbal,total:A+P+R+fcr+afrr+imbal,aggFees,aggSvc,
     alloc:al,notes,cycles:cyclesPerDay(sim,cap),pick,sim};
 }
 
@@ -2291,10 +2478,12 @@ function getV(id){return parseFloat(el(id)?.value)||0;}
 //  tiers   : l'investisseur investit (dette + fonds propres), waterfall Art. 4.3, partage l'investisseur / client.
 //  propres : vente de la BESS au client. Le client investit et garde tous les revenus nets. Pas de l'investisseur.
 //  leasing : l'investisseur investit, le client paie un loyer et garde les revenus nets moins le loyer.
-function calcFin(rev){
+function calcFin(rev,ov){
+  ov=ov||{};const sc=ov.capexScale!=null?ov.capexScale:1,pr=ov.priceScale!=null?ov.priceScale:1;
   const model=S.finModel;
-  const capex=getV('fin-capex-batt')+getV('fin-capex-install')+getV('fin-capex-recycle')-getV('fin-capex-subsidy');
-  const opex=getV('fin-opex'),ems=getV('fin-ems');
+  const battPart=ov.battCost!=null?ov.battCost:getV('fin-capex-batt')*sc;
+  const capex=battPart+(getV('fin-capex-install')+getV('fin-capex-recycle'))*sc-getV('fin-capex-subsidy');
+  const opex=getV('fin-opex')*(ov.opexScale!=null?ov.opexScale:sc),ems=getV('fin-ems');
   const wacc=getV('fin-wacc')/100,dur=parseInt(el('fin-duration').value)||15;
   const infla=getV('fin-inflation')/100;
   const dr=model==='propres'?0:getV('fin-debt-ratio')/100;
@@ -2308,9 +2497,17 @@ function calcFin(rev){
   const lease=model==='leasing'?getV('fin-lease-annual'):0;
   const aggFees=rev.aggFees||0;
   const rows=[],cfs=[],cfsC=[],netRevs=[];
+  const deg=getV('batt-deg')/100,life=parseInt(el('batt-life')?.value)||dur;
+  // Dégradation : les revenus liés à l'énergie et à la puissance baissent avec la capacité (simplification : proportionnel)
   for(let y=1;y<=dur;y++){
     const inf=Math.pow(1+infla,y-1);
-    const bruts=rev.total*inf,agg=aggFees*inf,ops=(opex+ems)*inf;
+    const health=y>life?0:Math.max(0,1-deg*(y-1));
+    // FCR/aFRR sont rémunérés à la puissance : seule la réserve d'énergie compte, pas la capacité restante
+    const alc=rev.alloc,svc=(rev.fcr||0)+(rev.afrr||0),aggSvc=rev.aggSvc||0;
+    const f1=alc&&alc.eRes>0?Math.min(1,alc.band/(2*alc.eRes)):1;
+    const fY=alc&&alc.eRes>0?Math.min(1,alc.band*health/(2*alc.eRes)):1;
+    const ratio=f1>0?fY/f1:1;
+    const bruts=((rev.total-svc)*health+svc*ratio)*inf,agg=((aggFees-aggSvc)*health+aggSvc*ratio)*inf,ops=(opex+ems)*inf*(y>life?0:1);
     const bank=(model!=='propres'&&y<=ly)?realAnnuity:0;
     let nets,wgi=0,client=0,partW=0;
     if(model==='tiers'){
@@ -2339,10 +2536,167 @@ function calcFin(rev){
     ip:invBase>0?(npv+invBase)/invBase:0,dur,wgiShare,netRevs};
 }
 
+
+
+// ═══════════════════════ FACTURE MENSUELLE ET SENSIBILITÉS ═══════════════════════
+function monthlyBill(baseline,sim){
+  const tm=getV('p-monthly-peak')||6.76,ty=getV('p-yearly-peak')||40.54;
+  const mk=()=>({e:new Array(12).fill(0),pk:new Array(12).fill(0)});
+  const B=mk(),A=mk();
+  for(let i=0;i<baseline.length;i++){
+    const b=baseline[i],s=sim[i],m=b.ts?b.ts.getMonth():Math.min(11,Math.floor(i/2920));
+    B.e[m]+=(Math.max(0,b.netGrid)*b.pOff-Math.max(0,-b.netGrid)*b.pInj)/1000*0.25;
+    A.e[m]+=(Math.max(0,s.netGrid)*b.pOff-Math.max(0,-s.netGrid)*b.pInj)/1000*0.25;
+    if(Math.max(0,b.netGrid)>B.pk[m])B.pk[m]=Math.max(0,b.netGrid);
+    if(Math.max(0,s.netGrid)>A.pk[m])A.pk[m]=Math.max(0,s.netGrid);
+  }
+  const yB=Math.max(...B.pk),yA=Math.max(...A.pk);
+  const rows=[];
+  for(let m=0;m<12;m++){
+    const pB=B.pk[m]*tm+yB*ty/12,pA=A.pk[m]*tm+yA*ty/12;
+    rows.push({m,eB:B.e[m],eA:A.e[m],pB,pA,before:B.e[m]+pB,after:A.e[m]+pA,save:B.e[m]+pB-A.e[m]-pA});
+  }
+  return rows;
+}
+const MOIS=['Janv','Févr','Mars','Avr','Mai','Juin','Juil','Août','Sept','Oct','Nov','Déc'];
+let chartBill=null;
+function renderBill(){
+  const R=S.simResults,rows=monthlyBill(R.baseline,R.revB.sim);
+  const tB=rows.reduce((a,r)=>a+r.before,0),tA=rows.reduce((a,r)=>a+r.after,0);
+  el('res-bill-table').innerHTML='<thead><tr><th>Mois</th><th>Avant (€)</th><th>Après (€)</th><th>Économie (€)</th></tr></thead><tbody>'+
+    rows.map(r=>`<tr><td>${MOIS[r.m]}</td><td>${fmt(r.before,0)}</td><td>${fmt(r.after,0)}</td><td>${fmt(r.save,0)}</td></tr>`).join('')+
+    `<tr style="font-weight:700"><td>Total</td><td>${fmt(tB,0)}</td><td>${fmt(tA,0)}</td><td>${fmt(tB-tA,0)}</td></tr></tbody>`;
+  if(chartBill)chartBill.destroy();
+  chartBill=new Chart(el('chart-bill'),{type:'bar',data:{labels:MOIS,datasets:[
+    {label:'Avant batterie',data:rows.map(r=>Math.round(r.before)),backgroundColor:'#C9CFC8'},
+    {label:'Après batterie',data:rows.map(r=>Math.round(r.after)),backgroundColor:'#5E7768'}]},
+    options:{responsive:true,maintainAspectRatio:false,animation:false,plugins:{legend:{position:'bottom'}},scales:{y:{ticks:{callback:v=>v+' €'}}}}});
+  S.billRows=rows;
+}
+// Sensibilités : prix de l'énergie, coût de la batterie, prix FCR/aFRR, consommation (rejoue le dispatch)
+function scaleRev(rev,e,f){
+  const k='base',fcrFee=rev.fcr*getV(k+'-fcr-agg')/100,afrrFee=rev.afrr*getV(k+'-afrr-agg')/100,imbFee=rev.aggFees-fcrFee-afrrFee;
+  const r=Object.assign({},rev,{autoconso:rev.autoconso*e,arb:rev.arb*e,fcr:rev.fcr*f,afrr:rev.afrr*f});
+  r.total=r.autoconso+r.peak+r.arb+r.fcr+r.afrr+r.imbal;
+  r.aggFees=fcrFee*f+afrrFee*f+imbFee;r.aggSvc=(fcrFee+afrrFee)*f;
+  return r;
+}
+function renderSens(){
+  const R=S.simResults,L=FIN_LABELS[R.finB.model],B=R.finB,rev=R.revB;
+  const fin=(r,ov)=>calcFin(r,ov);
+  const def=[
+    ['Prix de l\'énergie',d=>fin(scaleRev(rev,1+d,1))],
+    ['Coût de la batterie (CAPEX)',d=>fin(rev,{capexScale:1+d})],
+    ['Prix FCR et aFRR',d=>fin(scaleRev(rev,1,1+d))],
+    ['Consommation du site',d=>{
+      const data=R.data.map(s=>Object.assign({},s,{cons:s.cons*(1+d)}));
+      const base=data.map(s=>({...s,bAC:0,netGrid:s.cons-s.pv,soc:0}));
+      const sim=runDispatch(data,R.battCfg,'base'),na=runDispatch(data,R.battCfg,'base',true);
+      return fin(calcRevenues(base,sim,'base',na,R.battCfg));}]
+  ];
+  const res=def.map(([n,fn])=>({n,lo:fn(-0.2),hi:fn(0.2)}));
+  const mx=Math.max(1,...res.map(r=>Math.max(Math.abs(r.lo.npv-B.npv),Math.abs(r.hi.npv-B.npv))));
+  const bar=(v,col)=>`<div style="height:10px;width:${Math.round(Math.abs(v)/mx*100)}%;background:${col};border-radius:2px"></div>`;
+  el('res-sens').innerHTML=`<div style="font-size:.84rem;margin-bottom:6px">Variation de ±20 % de chaque hypothèse, le reste inchangé. Référence : VAN ${L.inv} <b>${fE(B.npv,0)}</b>, retour ${B.payback?fmt(B.payback,1)+' ans':'n/a'}.</div>
+  <div style="overflow-x:auto"><table class="rev-table"><thead><tr><th>Hypothèse</th><th>−20 % : VAN</th><th>−20 % : retour</th><th>+20 % : VAN</th><th>+20 % : retour</th><th>Impact VAN</th></tr></thead><tbody>`+
+  res.map(r=>`<tr><td>${r.n}</td><td>${fE(r.lo.npv,0)}</td><td>${r.lo.payback?fmt(r.lo.payback,1)+' ans':'n/a'}</td><td>${fE(r.hi.npv,0)}</td><td>${r.hi.payback?fmt(r.hi.payback,1)+' ans':'n/a'}</td><td style="min-width:110px">${bar(r.lo.npv-B.npv,'#B7C4BA')}${bar(r.hi.npv-B.npv,'#5E7768')}</td></tr>`).join('')+'</tbody></table></div>';
+  S.sens=res;
+}
+
+
+// ═══════════════════════ COMPARAISON DE CONTRATS ═══════════════════════
+function compareContracts(){
+  if(!S.simResults)return;
+  const btn=el('btn-contracts'),out=el('res-contracts');
+  btn.disabled=true;out.innerHTML='<div class="ib">Calcul en cours...</div>';
+  setTimeout(()=>{
+    const saveT=S.priceType,saveV=S.varPrice,cfg=S.simResults.battCfg,L=FIN_LABELS[S.simResults.finB.model];
+    const hasSpot=!!(S.spotPrices&&S.spotPrices.length);
+    const defs=[['flat','Prix fixe'],['tou','Heures pleines / creuses'],['index','Indexé (formule)']];
+    if(hasSpot)defs.push(['spot','Dynamique (spot 15 min)']);
+    const rows=[];
+    try{
+      defs.forEach(([t,n])=>{
+        S.priceType=t;
+        const data=mergeData();if(!data)return;
+        const base=data.map(x=>({...x,bAC:0,netGrid:x.cons-x.pv,soc:0}));
+        const sim=runDispatch(data,cfg,'base'),na=runDispatch(data,cfg,'base',true);
+        const rev=calcRevenues(base,sim,'base',na,cfg),fin=calcFin(rev);
+        const bill=monthlyBill(base,rev.sim);
+        const bB=bill.reduce((a,x)=>a+x.before,0),bA=bill.reduce((a,x)=>a+x.after,0);
+        const mkt=rev.fcr+rev.afrr+rev.imbal-rev.aggFees;
+        rows.push({t,n,bB,bA,mkt,net:bA-mkt,rev,fin,cur:t===saveT});
+      });
+    }finally{S.priceType=saveT;S.varPrice=saveV;}
+    const best=rows.slice().sort((a,b)=>a.net-b.net)[0];
+    out.innerHTML=`<div class="ib ok" style="margin-bottom:8px">Coût net annuel le plus bas avec la batterie : <b>${best.n}</b> (${fE(best.net,0)}). Le coût net est la facture d'énergie et de pointe avec batterie, moins les revenus de marché nets de commission.</div>
+    <div style="overflow-x:auto"><table class="rev-table"><thead><tr><th>Contrat</th><th>Facture sans batterie</th><th>Facture avec batterie</th><th>Revenus de marché nets</th><th>Coût net avec batterie</th><th>Retour</th><th>VAN ${L.inv}</th></tr></thead><tbody>`+
+    rows.map(r=>`<tr${r===best?' style="background:var(--greenp)"':''}><td>${r.n}${r.cur?' <span style="font-size:.84rem;color:var(--g400)">(contrat saisi)</span>':''}</td><td>${fE(r.bB,0)}</td><td>${fE(r.bA,0)}</td><td>${fE(r.mkt,0)}</td><td><b>${fE(r.net,0)}</b></td><td>${r.fin.payback?fmt(r.fin.payback,1)+' ans':'n/a'}</td><td>${fE(r.fin.npv,0)}</td></tr>`).join('')+`</tbody></table></div>
+    <div style="font-size:.84rem;color:var(--g400);margin-top:5px">Chaque ligne utilise les paramètres de prix saisis à l'étape contrat (prix fixe, HP/HC, formule). Un contrat dynamique expose à des heures chères : la comparaison porte sur l'année simulée, pas sur le risque.</div>`;
+    btn.disabled=false;
+  },30);
+}
+
+// ═══════════════════════ DIMENSIONNEMENT OPTIMAL ═══════════════════════
+// Balaye capacité x durée (kWh/kW) en scénario Base. Coûts (CAPEX, maintenance) proportionnels à la capacité.
+function sizingCtx(){
+  const data=mergeData();if(!data)return null;
+  const cfg={cap:parseFloat(el('batt-cap').value)||215,pow:parseFloat(el('batt-pow').value)||100,effRT:(parseFloat(el('batt-eff').value)||92)/100,socMin:(parseFloat(el('batt-soc-min').value)||10)/100,socMax:(parseFloat(el('batt-soc-max').value)||90)/100};
+  return {data,baseline:data.map(s=>({...s,bAC:0,netGrid:s.cons-s.pv,soc:0})),battCfg:cfg};
+}
+function sizingRun(ctx,cap,pow,ov){
+  const cfg=Object.assign({},ctx.battCfg,{cap,pow});
+  const sim=runDispatch(ctx.data,cfg,'base'),na=runDispatch(ctx.data,cfg,'base',true);
+  const rev=calcRevenues(ctx.baseline,sim,'base',na,cfg);
+  const fin=calcFin(rev,ov||(capexAuto()?{capexScale:cap/ctx.battCfg.cap,battCost:battCost(cap)}:{capexScale:cap/ctx.battCfg.cap}));
+  return {cap,pow,rev,fin};
+}
+function applySizing(i){
+  const r=S.sizing&&S.sizing[i];if(!r)return;
+  const f=r.cap/S.sizingC0;
+  el('batt-cap').value=r.cap;el('batt-pow').value=r.pow;if(r.mod!=null){el('batt-model').value=r.mod;el('batt-qty').value=r.n;}else el('batt-model').value='';
+  (capexAuto()?['fin-capex-install','fin-capex-recycle','fin-opex']:['fin-capex-batt','fin-capex-install','fin-capex-recycle','fin-opex']).forEach(id=>{const e=el(id);if(e&&e.value)e.value=Math.round(parseFloat(e.value)*f);});
+  syncBattCapex();
+  ['cons','base','opti'].forEach(k=>{if(typeof updateAlloc==='function')updateAlloc(k,'');});
+  el('res-size').insertAdjacentHTML('afterbegin',`<div class="ib ok" style="margin-bottom:8px">Configuration appliquée : ${fmt(r.cap,0)} kWh / ${fmt(r.pow,0)} kW. Capacité, puissance, coût et maintenance mis à jour. Passez à l'étape suivante pour vérifier la batterie.</div>`);
+  S.simResults=null;el('res-content').classList.add('hidden');el('res-placeholder').classList.remove('hidden');if(typeof updateSide==='function')updateSide();
+}
+function runSizing(){
+  const btn=el('btn-size'),out=el('res-size');
+  if(!S.conso){out.innerHTML='<div class="ib warn">Importez d\'abord la consommation.</div>';return;}
+  btn.disabled=true;out.innerHTML='<div class="ib">Calcul en cours...</div>';
+  syncBattCapex();
+  setTimeout(()=>{
+    const ctx=sizingCtx();if(!ctx){btn.disabled=false;out.innerHTML='';return;}
+    const c0=ctx.battCfg.cap,p0=ctx.battCfg.pow,L=FIN_LABELS[S.finModel];
+    S.sizingC0=c0;
+    const maxPow=Math.max(getV('site-grid-limit'),p0);   // la puissance ne dépasse pas le raccordement du site
+    const rows=[],seen=new Set();
+    BESS_CATALOG.map((m,mi)=>[m,mi]).reverse().forEach(([m,mi])=>{for(let n=1;n<=12&&m.p*n<=maxPow+0.01;n++){
+      const cap=m.c*n,pow=m.p*n,key=cap+'/'+pow;if(seen.has(key))continue;seen.add(key);
+      const r=sizingRun(ctx,cap,pow);r.mod=mi;r.n=n;rows.push(r);}});
+    const excl=0;
+    const cur=sizingRun(ctx,c0,p0,capexAuto()?{capexScale:1,battCost:battCost(c0)}:{capexScale:1});cur.current=true;rows.push(cur);
+    S.sizing=rows;
+    const ok=rows.filter(r=>isFinite(r.fin.npv));
+    const best=ok.slice().sort((a,b)=>b.fin.npv-a.fin.npv)[0];
+    const fastest=ok.filter(r=>r.fin.payback).sort((a,b)=>a.fin.payback-b.fin.payback)[0];
+    const top=ok.slice().sort((a,b)=>b.fin.npv-a.fin.npv).slice(0,8);
+    if(!top.includes(cur))top.push(cur);
+    const tag=r=>[r===best?'VAN max':'',r===fastest?'Retour le plus court':'',r.current?'Config actuelle':''].filter(Boolean).join(' · ');
+    out.innerHTML=`<div class="ib ok" style="margin-bottom:8px">Meilleure VAN ${L.inv} : <b>${fmt(best.cap,0)} kWh / ${fmt(best.pow,0)} kW</b> (${fmt(best.cap/best.pow,1)} h), VAN ${fE(best.fin.npv,0)}, retour ${best.fin.payback?fmt(best.fin.payback,1)+' ans':'n/a'}. `+
+      (best===cur?'La configuration actuelle est déjà la meilleure testée.':`La configuration actuelle (${fmt(c0,0)} kWh / ${fmt(p0,0)} kW) donne ${fE(cur.fin.npv,0)}.`)+`</div>
+      <div style="overflow-x:auto"><table class="rev-table"><thead><tr><th>Configuration</th><th>Capacité</th><th>Puissance</th><th>Durée</th><th>CAPEX net</th><th>Revenus bruts/an</th><th>Retour</th><th>TRI</th><th>VAN</th><th></th><th></th></tr></thead><tbody>`+
+      top.map(r=>`<tr${r===best?' style="background:var(--greenp)"':''}><td>${r.mod!=null?r.n+' × '+modLabel(BESS_CATALOG[r.mod]):'Saisie actuelle'}</td><td>${fmt(r.cap,0)} kWh</td><td>${fmt(r.pow,0)} kW</td><td>${fmt(r.cap/r.pow,1)} h</td><td>${fE(r.fin.capex,0)}</td><td>${fE(r.rev.total,0)}</td><td>${r.fin.payback?fmt(r.fin.payback,1)+' ans':'n/a'}</td><td>${r.fin.irr?fmt(r.fin.irr*100,1)+' %':'n/a'}</td><td><b>${fE(r.fin.npv,0)}</b></td><td style="font-size:.84rem">${tag(r)}</td><td>${r.current?'':`<button class="btn btn-secondary" style="padding:3px 8px;font-size:.84rem" onclick="applySizing(${rows.indexOf(r)})">Appliquer</button>`}</td></tr>`).join('')+`</tbody></table></div>
+      <div style="font-size:.84rem;color:var(--g400);margin-top:5px">${rows.length-1} configurations testées${true?` (modules du catalogue, puissance limitée au raccordement de ${fmt(maxPow,0)} kW)`:''}. Hypothèses : coût de la batterie selon la grille de prix de l'étape Financement (dégressif si activé), installation, recyclage et maintenance proportionnels à la capacité ; puissance limitée à ${fmt(maxPow,0)} kW (raccordement du site) ; revenus FCR/aFRR proportionnels à la puissance engagée, sans effet de saturation du marché ni offre minimale d'agrégation. « Appliquer » met à jour capacité, puissance, CAPEX et maintenance.</div>`;
+    btn.disabled=false;
+  },30);
+}
 // ═══════════════════════ RUN SIMULATION ═══════════════════════
 let chartMonthly=null,chartWeekly=null;
 
 function runSimulation(){
+  syncBattCapex();
   const data=mergeData();
   if(!data)return;
   const battCfg={cap:parseFloat(el('batt-cap').value)||215,pow:parseFloat(el('batt-pow').value)||100,effRT:(parseFloat(el('batt-eff').value)||92)/100,socMin:(parseFloat(el('batt-soc-min').value)||10)/100,socMax:(parseFloat(el('batt-soc-max').value)||90)/100};
@@ -2401,6 +2755,31 @@ function render(){
   el('res-before').innerHTML=mkT([['Soutirage réseau',fmt(tCB,1)+' MWh'],['Injection réseau',fmt(tIB,1)+' MWh'],['Pic mensuel moyen',fmt(avgPB,0)+' kW'],['Autoconsommation PV',fmt(selfB,1)+' %']]);
   el('res-after').innerHTML=mkT([['Soutirage réseau',fmt(tCA,1)+' MWh'],['Injection réseau',fmt(tIA,1)+' MWh'],['Pic mensuel moyen',fmt(avgPA,0)+' kW'],['Autoconsommation PV',fmt(selfA,1)+' %'],['Réduction pic',fmt(avgPB-avgPA,0)+' kW'],['Cycles site / jour',fmt(revB.cycles,2)],['Allocation FCR / aFRR / site',`${fmt(al.fF*100)} / ${fmt(al.aF*100)} / ${fmt(al.sF*100)} %`]]);
 
+  // Calibrage : volumes et pointes simulés (sans batterie) contre les factures importées
+  (function(){
+    const card=el('res-calib-card'),box=el('res-calib');
+    const inv=(typeof selectedInvoices==='function'?selectedInvoices():[]).filter(i=>i.usable&&i.eTot>0);
+    if(!inv.length){card.classList.add('hidden');return;}
+    const rows=inv.map(i=>{
+      const idx=periodSlots(baseline,i);if(!idx.length)return null;
+      const simMWh=idx.reduce((a,j)=>a+Math.max(0,baseline[j].netGrid)*0.25,0)/1000;
+      const simPk=Math.max(...idx.map(j=>Math.max(0,baseline[j].netGrid)));
+      const gap=(simMWh-i.eTot)/i.eTot*100;
+      const gp=i.pMax>0?(simPk-i.pMax)/i.pMax*100:null;
+      return {i,simMWh,simPk,gap,gp};
+    }).filter(Boolean);
+    if(!rows.length){card.classList.add('hidden');return;}
+    const tI=rows.reduce((a,r)=>a+r.i.eTot,0),tS=rows.reduce((a,r)=>a+r.simMWh,0),g=(tS-tI)/tI*100;
+    const cls=Math.abs(g)<=5?'ok':(Math.abs(g)<=15?'warn':'warn');
+    const verdict=Math.abs(g)<=5?'Profil cohérent avec les factures (écart de 5 % ou moins).':Math.abs(g)<=15?'Écart modéré : vérifier le profil ou l\'année de référence.':'Écart important : le profil de consommation ne reflète pas les factures, les revenus sont à prendre avec prudence.';
+    box.innerHTML=`<div class="ib ${cls}" style="margin-bottom:8px"><b>Écart global : ${g>0?'+':''}${fmt(g,1)} %</b> (simulé ${fmt(tS,1)} MWh contre ${fmt(tI,1)} MWh facturés sur ${rows.length} période(s)). ${verdict}</div>
+    <div style="overflow-x:auto"><table class="rev-table"><thead><tr><th>Période</th><th>Facturé (MWh)</th><th>Simulé (MWh)</th><th>Écart</th><th>Pointe facturée (kW)</th><th>Pointe simulée (kW)</th></tr></thead><tbody>`+
+    rows.map(r=>`<tr><td>${r.i.start.toLocaleDateString('fr-BE')} au ${r.i.end.toLocaleDateString('fr-BE')}</td><td>${fmt(r.i.eTot,2)}</td><td>${fmt(r.simMWh,2)}</td><td>${r.gap>0?'+':''}${fmt(r.gap,1)} %</td><td>${r.i.pMax>0?fmt(r.i.pMax,0):'n/a'}</td><td>${fmt(r.simPk,0)}</td></tr>`).join('')+`</tbody></table></div>`;
+    card.classList.remove('hidden');
+  })();
+
+  renderBill();renderSens();
+  el('res-contracts').innerHTML='';
   // Revenus (Base) + waterfall selon le modèle
   const r0=finB.rows[0],tot=revB.total;
   const src=[['Autoconsommation',revB.autoconso,'#2A9A68'],['Réduction des pointes',revB.peak,'#C77A1A'],['Arbitrage',revB.arb,'#3F78B8'],['FCR',revB.fcr,'#C4553D'],['aFRR',revB.afrr,'#7C5AB8'],['Imbalance',revB.imbal,'#0C97A6']];
@@ -3416,6 +3795,14 @@ function rpCumSVG(vals){
   const bars=vals.map((v,i)=>`<rect x="${x(i)}" y="${Math.min(y(v),y(0))}" width="${bw}" height="${Math.max(1,Math.abs(y(v)-y(0)))}" rx="2" fill="${v<0?'#CFCDC2':'#5E7768'}"/>`+(i%(n>12?2:1)===0||i===n-1?`<text x="${x(i)+bw/2}" y="${H-8}" font-size="9" fill="#66736C" text-anchor="middle">${i}</text>`:'')).join('');
   return `<svg viewBox="0 0 ${W} ${H}" width="100%" xmlns="http://www.w3.org/2000/svg" font-family="Arial,sans-serif">${g}${bars}<text x="${W-pr}" y="${H-0}" font-size="8.5" fill="#8F968F" text-anchor="end">années</text></svg>`;
 }
+function rpBillSVG(rows){
+  const W=520,H=190,pl=52,pr=8,pt=12,pb=24,n=rows.length;
+  const mx=Math.max(1,...rows.map(r=>r.before)),y=v=>pt+(mx-v)/mx*(H-pt-pb),gw=(W-pl-pr)/n,bw=gw*0.36;
+  const step=Math.pow(10,Math.floor(Math.log10(mx/4)));const tick=[1,2,2.5,5,10].map(m=>m*step).find(t=>mx/t<=5)||step*10;
+  let g='';for(let t=0;t<=mx+1e-9;t+=tick)g+=`<line x1="${pl}" x2="${W-pr}" y1="${y(t)}" y2="${y(t)}" stroke="${t===0?'#1F2925':'#E7E6DD'}" stroke-width="${t===0?1.2:0.6}"/><text x="${pl-5}" y="${y(t)+3.5}" font-size="9" fill="#66736C" text-anchor="end">${fmt(t,0)}</text>`;
+  const bars=rows.map((r,i)=>{const x0=pl+i*gw+gw*0.12;return `<rect x="${x0}" y="${y(r.before)}" width="${bw}" height="${Math.max(1,y(0)-y(r.before))}" rx="1.5" fill="#c4c4c0"/><rect x="${x0+bw+1}" y="${y(r.after)}" width="${bw}" height="${Math.max(1,y(0)-y(r.after))}" rx="1.5" fill="#8BA31F"/><text x="${x0+bw}" y="${H-8}" font-size="8.5" fill="#66736C" text-anchor="middle">${MOIS[r.m]}</text>`;}).join('');
+  return `<svg viewBox="0 0 ${W} ${H}" width="100%" xmlns="http://www.w3.org/2000/svg" font-family="Arial,sans-serif">${g}${bars}<rect x="${W-150}" y="2" width="8" height="8" fill="#c4c4c0"/><text x="${W-139}" y="9.5" font-size="9" fill="#444">Avant</text><rect x="${W-100}" y="2" width="8" height="8" fill="#8BA31F"/><text x="${W-89}" y="9.5" font-size="9" fill="#444">Après (€ / mois)</text></svg>`;
+}
 const RP_SRC=[
   ['autoconso','Autoconsommation','#2A9A68','Le surplus solaire est stocké puis consommé sur place au lieu d\'être injecté au réseau à bas prix.'],
   ['peak','Réduction des pointes','#C77A1A','La batterie écrête les pointes de puissance, ce qui réduit la part capacitaire de la facture réseau.'],
@@ -3510,6 +3897,19 @@ function buildReportHTML(){
     ${m==='propres'?`<tr><td>0</td><td></td><td>Investissement</td><td>-${fE(f.capex,0)}</td><td>${fE(-f.capex,0)}</td></tr>`:''}${fr}
     <tr class="tot"><td>Total</td><td>${fE(rows.reduce((a,x)=>a+x.bruts,0),0)}</td><td></td><td>${fE(clientCum,0)}</td><td>${fE(cumV[cumV.length-1],0)}</td></tr></tbody></table>
     <p class="rp-note">Montants hors TVA, indexés de ${fmt(getV('fin-inflation'),1)} % par an.</p>`;
+  // ---- Page 4 : facture mensuelle et sensibilités ----
+  const bill=monthlyBill(R.baseline,r.sim),bB=bill.reduce((a,x)=>a+x.before,0),bA=bill.reduce((a,x)=>a+x.after,0);
+  const cumOf=ff=>{const c=ff.rows.reduce((a,x)=>a+x.client,0);return m==='propres'?c-ff.capex:c;};
+  const sens=S.sens||[];
+  const sensTbl=sens.length?`<h2>Et si les hypothèses changent ?</h2><p>Effet d'une variation de 20 % de chaque hypothèse sur le gain ${m==='propres'?'net':'cumulé'} sur ${dur} ans (scénario base, référence ${fE(cumOf(R.finB),0)}).</p>
+    <table class="rp-tbl"><thead><tr><th>Hypothèse</th><th>20 % de moins</th><th>20 % de plus</th></tr></thead><tbody>`+
+    sens.map(x=>`<tr><td>${x.n}</td><td>${fE(cumOf(x.lo),0)}</td><td>${fE(cumOf(x.hi),0)}</td></tr>`).join('')+`</tbody></table>`:'';
+  const p3b=`<h2 style="margin-top:0">Votre facture mois par mois</h2>
+    <p>Facture d'énergie et de pointe du site, avec et sans batterie. Les revenus des services au réseau viennent en supplément et ne figurent pas ici.</p>
+    ${rpBillSVG(bill)}
+    <table class="rp-tbl" style="margin-top:3mm"><thead><tr><th>Mois</th><th>Sans batterie</th><th>Avec batterie</th><th>Économie</th></tr></thead><tbody>
+    ${bill.map(x=>`<tr><td>${MOIS[x.m]}</td><td>${fE(x.before,0)}</td><td>${fE(x.after,0)}</td><td>${fE(x.save,0)}</td></tr>`).join('')}
+    <tr class="tot"><td>Total</td><td>${fE(bB,0)}</td><td>${fE(bA,0)}</td><td>${fE(bB-bA,0)}</td></tr></tbody></table>${sensTbl}`;
   // ---- Page 4 : hypothèses ----
   const refSel=el({C:'cons',B:'base',O:'opti'}[o.scen]+'-ref-year');
   const priceTxt={tou:`tarif heures pleines / creuses (${fmt(getV('p-offtake-hp'))} / ${fmt(getV('p-offtake-hc'))} €/MWh tout compris)`,flat:`tarif unique de ${fmt(getV('p-flat'))} €/MWh`,
@@ -3526,11 +3926,11 @@ function buildReportHTML(){
   </ul>
   <h2>Points d'attention</h2><ul class="rp-list">
     <li>Les revenus des services au réseau (FCR, aFRR) dépendent des prix de marché et ne sont pas garantis. Ils ont varié du simple au double entre 2021 et 2025.</li>
-    <li>La capacité de la batterie est supposée constante sur la durée de l'étude ; la perte de capacité liée au vieillissement n'est pas déduite.</li>
+    <li>Le vieillissement de la batterie est pris en compte : perte de capacité de ${fmt(getV('batt-deg'),1)} % par an, durée de vie ${fmt(getV('batt-life'),0)} ans.</li>
     <li>Le profil de consommation ${S.consoSource&&/facture|Profil/.test(S.consoSource)?'a été reconstitué à partir de vos factures et d\'un profil type ; des mesures quart-horaires permettraient d\'affiner l\'étude':'est celui de l\'année de mesure fournie'}.</li>
     <li>Cette étude est indicative et ne constitue pas une offre contractuelle. Les montants sont exprimés hors TVA.</li></ul>
   <div class="rp-sign"><div><b>${esc(o.issuer)}</b>${o.contact?'<br/>'+esc(o.contact):''}</div><div style="text-align:right;color:#6b6b67">${esc(o.date)}</div></div>`;
-  const pages=[['Synthèse',p1],['Économies et revenus',p2],['Plan financier',p3],['Hypothèses',p4]];
+  const pages=[['Synthèse',p1],['Économies et revenus',p2],['Plan financier',p3],['Facture et sensibilités',p3b],['Hypothèses',p4]];
   return pages.map((p,i)=>rpPage(i+1,pages.length,o,p[0],p[1])).join('');
 }
 async function downloadReportPDF(){
@@ -3567,7 +3967,8 @@ const STEPS=[
   {k:'conso',tab:'t1',sub2:'s-conso',title:'Consommation',sub:'Importez les données quart-horaires ou des factures, ou partez d\'un profil type.'},
   {k:'prix',tab:'t1',sub2:'s-prix',title:'Contrat d\'énergie',sub:'Le prix payé pour chaque kWh prélevé, et reçu pour chaque kWh injecté.'},
   {k:'pv',tab:'t1',sub2:'s-pv',title:'Production solaire',sub:'Simulez l\'installation ou importez sa production.'},
-  {k:'batt',tab:'t2',title:'Batterie et site',sub:'Dimensionnement, limites techniques et stratégie de pilotage.'},
+  {k:'size',tab:'t6',title:'Dimensionnement optimal',sub:'Comparez les modèles de batteries de 2 h (25, 50, 100 et 125 kW) et leurs multiples.'},
+  {k:'batt',tab:'t2',title:'Choix batterie et site',sub:'Capacité, puissance, limites techniques et stratégie de pilotage.'},
   {k:'scen',tab:'t3',title:'Marchés et scénarios',sub:'Répartition de la batterie entre le site et les services au réseau, sur trois scénarios de prix.'},
   {k:'fin',tab:'t4',title:'Financement',sub:'Investissement, coûts d\'exploitation et modèle : vente, tiers-investissement ou leasing.'},
   {k:'res',tab:'t5',title:'Résultats',sub:'Revenus, rentabilité et étude à remettre au client.'},
@@ -3590,6 +3991,7 @@ function syncNav(){
 }
 function goStep(k){
   const st=STEPS.find(s=>s.k===k);if(!st)return;
+  if(typeof hideHelp==='function')hideHelp(true);
   document.querySelector(`.ntab[data-tab="${st.tab}"]`).click();
   if(st.sub2)document.querySelector(`.stab2[data-sub="${st.sub2}"]`).click();
   syncNav();window.scrollTo(0,0);
@@ -3601,7 +4003,7 @@ function nextStep(){
 function updateSide(){
   const needSpot=S.priceType==='spot'||(S.priceType==='index'&&el('p-idx-source').value!=='fixed');
   const ready={conso:!!S.conso,prix:(!needSpot||!!S.spotPrices)&&NAV.visited.has('prix'),pv:(S.pvMode==='none')||!!(S.pvSlots&&S.pvSlots.length),
-    batt:NAV.visited.has('batt')&&NAV.current!=='batt',scen:NAV.visited.has('scen')&&NAV.current!=='scen',fin:NAV.visited.has('fin')&&NAV.current!=='fin',res:!!S.simResults};
+    size:NAV.visited.has('size')&&NAV.current!=='size',batt:NAV.visited.has('batt')&&NAV.current!=='batt',scen:NAV.visited.has('scen')&&NAV.current!=='scen',fin:NAV.visited.has('fin')&&NAV.current!=='fin',res:!!S.simResults};
   document.querySelectorAll('.step').forEach(b=>b.classList.toggle('done',!!ready[b.dataset.step]));
   const miss=[];if(!S.conso)miss.push('la consommation');if(!ready.pv)miss.push('la production solaire');if(needSpot&&!S.spotPrices)miss.push('les prix spot');
   el('side-status').textContent=miss.length?'Il manque : '+miss.join(', ')+'.':(S.simResults?'Simulation à jour. Modifiez une étape puis relancez pour comparer.':'Données complètes. Vous pouvez lancer la simulation.');
@@ -3619,9 +4021,9 @@ function loadDemo(){
   document.querySelector('#pv-method-pills .tpill[data-pvmethod="ratio"]').click();el('pv-kwc').value=300;el('pv-ratio').value=900;generatePV();
   setTimeout(()=>{
     document.querySelector('.msb[data-model="propres"]').click();
-    el('batt-cap').value=430;el('batt-pow').value=200;el('fin-capex-batt').value=100000;
+    el('batt-cap').value=430;el('batt-pow').value=200;syncBattCapex();
     ['cons','base','opti'].forEach(k=>updateAlloc(k,''));updateCapex();
-    ['prix','batt','scen','fin'].forEach(k=>NAV.visited.add(k));
+    ['prix','size','batt','scen','fin'].forEach(k=>NAV.visited.add(k));
     runSimulation();
   },450);
 }
@@ -3639,6 +4041,104 @@ function clearLogo(){S.logo='';saveIssuer();refreshReport();}
 { const st=loadIssuer();S.logo=st.logo||'';if(st.issuer)el('rp-issuer').value=st.issuer;if(st.contact)el('rp-contact').value=st.contact;
   ['rp-issuer','rp-contact'].forEach(id=>el(id).addEventListener('change',saveIssuer)); }
 
+// ═══════════════════════ GUIDE PAR ÉTAPE (bulle d'aide sur le « ? ») ═══════════════════════
+// Contenu purement éditorial : modifier les textes ici ne touche à aucun calcul.
+const GUIDE={
+  conso:{
+    but:'Reconstituer la consommation du site quart d\'heure par quart d\'heure sur une année. C\'est la base de tout le calcul.',
+    faut:['Idéalement, les données quart-horaires du compteur (export du portail du gestionnaire de réseau : ORES, Fluvius, Sibelga).','À défaut, une ou plusieurs factures d\'électricité en PDF.','Au minimum, la consommation annuelle en MWh et le type d\'activité du site.'],
+    faire:['Choisissez la source : coller, fichier Excel, profil type ou factures.','Avec un profil type, indiquez l\'activité (bureau, commerce, industrie, neutre), la consommation annuelle et, si vous la connaissez, la pointe 15 min.','Avec des factures, vérifiez les postes extraits puis générez le profil.'],
+    savoir:['Une facture mensuelle ne permet pas de déduire la consommation annuelle. Si la facture ne l\'indique pas, saisissez-la dans « Consommation annuelle retenue ».','Un profil type donne un ordre de grandeur. Les données quart-horaires réelles restent nettement plus fiables, surtout pour la réduction de pointe.']},
+  prix:{
+    but:'Décrire le prix payé pour chaque kWh prélevé et le prix reçu pour chaque kWh injecté. Ces prix déterminent la valeur de chaque kWh déplacé par la batterie.',
+    faut:['Le contrat ou une facture récente du fournisseur.','Pour un contrat indexé : la formule (constante et coefficient) en heures pleines et en heures creuses.','Pour un contrat spot : une série de prix horaires ou quart-horaires.'],
+    faire:['Choisissez le type de contrat : HP/HC, tarif unique, spot ou indexé.','Renseignez les prix de prélèvement et d\'injection, tous frais proportionnels compris, hors TVA.','Complétez les tarifs de pointe du réseau (mensuel et annuel) et la plage des heures pleines.'],
+    savoir:['Si vous avez importé une facture, le bouton « Appliquer la formule au contrat énergie » remplit cette étape automatiquement.','Les tarifs de pointe servent à chiffrer la réduction de pointe. Sans eux, ce gain vaut zéro.','Un contrat spot ou indexé sur le spot exige d\'avoir collé les prix spot, sinon la simulation ne peut pas démarrer.']},
+  pv:{
+    but:'Connaître la production solaire du site, pour mesurer le surplus que la batterie peut stocker au lieu de l\'injecter sur le réseau.',
+    faut:['La puissance crête installée (kWc).','Soit le ratio de production annuel (kWh/kWc), soit la localisation, l\'inclinaison et l\'orientation.','Ou, mieux, la production mesurée ou un rapport Archelios ou Helioscope.'],
+    faire:['Choisissez : simuler, fournir vos données mesurées, ou « Pas de PV sur ce site ».','En simulation, retenez une seule méthode : le ratio ou la localisation, jamais les deux.','Générez le profil puis contrôlez la production annuelle affichée.'],
+    savoir:['En Belgique, un ratio courant se situe entre 850 et 1 000 kWh/kWc selon l\'orientation et l\'inclinaison.','Sans installation solaire, la batterie ne peut plus compter sur l\'autoconsommation : ses gains viennent de la pointe, de l\'arbitrage et des services au réseau.']},
+  size:{
+    but:'Trouver la capacité et la puissance de batterie qui donnent la meilleure rentabilité pour ce site, avant de fixer le choix définitif.',
+    faut:['La consommation, le contrat d\'énergie et le solaire des étapes précédentes.','La batterie actuellement saisie (étape suivante) : elle sert de point de comparaison.','Les coûts de l\'étape Financement : ils sont ajustés proportionnellement à la capacité.'],
+    faire:['Cliquez sur « Chercher la taille optimale » : les quatre modèles du catalogue (25 kW / 50 kWh, 50 kW / 100 kWh, 100 kW / 233 kWh, 125 kW / 261 kWh) sont testés, seuls ou en multiples.','Comparez la VAN, le temps de retour et le taux de rendement des meilleures configurations.','Cliquez sur « Appliquer » pour reprendre une configuration dans l\'étape suivante.'],
+    savoir:['La meilleure VAN n\'est pas toujours le retour le plus court : une batterie plus grande peut créer plus de valeur au total.','La puissance est limitée au raccordement du site.','Les coûts sont supposés proportionnels à la capacité, sans effet d\'échelle : confirmez avec une offre réelle.']},
+  batt:{
+    but:'Définir la batterie étudiée et la façon dont elle est pilotée sur le site.',
+    faut:['La capacité (kWh) et la puissance (kW) envisagées.','Le rendement aller-retour et la plage de charge autorisée (SoC minimum et maximum), d\'après la fiche technique.'],
+    faire:['Saisissez capacité, puissance, rendement et plage de charge.','Choisissez la stratégie : combinée, autoconsommation, réduction de pointe ou arbitrage en priorité.','Fixez le seuil de réduction de pointe et le nombre maximum de cycles par jour.'],
+    savoir:['La réserve d\'énergie FCR / aFRR est la durée pendant laquelle la puissance engagée doit pouvoir être tenue. Elle réduit d\'autant l\'énergie disponible pour le site.','La limite de cycles par jour protège la durée de vie et évite de surestimer l\'arbitrage.','La dégradation annuelle, la durée de vie, la technologie et la limite de raccordement sont indicatives : elles ne modifient pas encore le calcul.']},
+  scen:{
+    but:'Répartir la batterie entre le site et les services rendus au réseau, puis tester trois hypothèses de prix : conservateur, base et optimiste.',
+    faut:['Une idée de la part de puissance à réserver au FCR et à l\'aFRR.','Les conditions de votre agrégateur : commission et disponibilité.'],
+    faire:['Pour chaque scénario, choisissez l\'année de référence des prix FCR / aFRR, ou saisissez vos propres prix.','Réglez la part FCR et la part aFRR. La part laissée au site s\'ajuste toute seule.','Choisissez comment valoriser la capacité libre : arbitrage, imbalance, ou le meilleur des deux.'],
+    savoir:['FCR + aFRR + site font toujours 100 %. Augmenter une part réduit automatiquement les autres : la batterie n\'est jamais vendue deux fois.','Arbitrage et imbalance utilisent la même énergie. Un seul des deux est retenu.','Les prix de référence sont des moyennes historiques, à valider avec votre agrégateur. Ils ne constituent pas une garantie.']},
+  fin:{
+    but:'Chiffrer l\'investissement et choisir qui le porte.',
+    faut:['Le prix de la batterie (par défaut 300 €/kWh jusqu\'à 270 kWh, puis 240 €/kWh au-delà) et de son installation.','Les coûts annuels : maintenance et logiciel de pilotage (EMS).','Selon le modèle : la clé de partage, les conditions du prêt ou le loyer.'],
+    faire:['Choisissez le modèle : tiers-investissement, vente au client ou leasing.','Renseignez l\'investissement, les subsides éventuels et les coûts d\'exploitation.','Fixez la durée du contrat, le taux d\'actualisation (WACC) et l\'inflation des revenus, puis lancez la simulation.'],
+    savoir:['Vente au client : il achète la batterie et conserve tous les gains.','Tiers-investissement : l\'investisseur finance, les revenus nets sont partagés selon la clé indiquée.','Leasing : le client paie un loyer fixe et conserve les gains.','Tous les montants sont hors TVA. Le taux de TVA affiché n\'intervient pas dans le calcul.']},
+  res:{
+    but:'Lire le résultat de la simulation et produire l\'étude à remettre au client.',
+    faut:['Une simulation lancée depuis l\'étape Financement ou le bouton du menu.'],
+    faire:['Commencez par les indicateurs : gain annuel, retour sur investissement, valeur actuelle nette.','Comparez la situation sans et avec batterie, puis l\'origine des revenus et les trois scénarios.','Cliquez sur « Créer l\'étude client (PDF) » pour générer le rapport à votre nom et à votre logo.'],
+    savoir:['Après toute modification d\'une étape, relancez la simulation : les résultats ne se mettent pas à jour seuls.','Le graphique d\'une semaine au quart d\'heure permet de vérifier que le pilotage est plausible.','Il s\'agit d\'estimations. Les revenus de marché ne sont pas garantis.']}
+};
+const HELP={key:null,pinned:false,anchor:null,tShow:0,tHide:0};
+function helpHTML(k){
+  const g=GUIDE[k],st=STEPS.find(s=>s.k===k),n=STEPS.indexOf(st);if(!g)return '';
+  const ul=a=>'<ul>'+a.map(x=>'<li>'+x+'</li>').join('')+'</ul>';
+  return '<div class="hp-head"><div><span class="hp-step">Étape '+n+' sur '+(STEPS.length-1)+'</span><h3>'+st.title+'</h3></div>'
+    +'<button type="button" class="hp-close" aria-label="Fermer le guide" onclick="hideHelp(true)">Fermer</button></div>'
+    +'<p class="hp-but">'+g.but+'</p>'
+    +'<h4>Ce qu\'il vous faut</h4>'+ul(g.faut)
+    +'<h4>Comment faire</h4><ol>'+g.faire.map(x=>'<li>'+x+'</li>').join('')+'</ol>'
+    +'<h4>À savoir</h4>'+ul(g.savoir);
+}
+function placeHelp(){
+  const pop=el('help-pop'),a=HELP.anchor;if(!a||pop.hidden)return;
+  const r=a.getBoundingClientRect(),vw=document.documentElement.clientWidth,vh=window.innerHeight,m=12;
+  pop.style.maxHeight=(vh-2*m)+'px';
+  const w=pop.offsetWidth,h=pop.offsetHeight;let x,y;
+  const side=a.classList.contains('help-side')&&vw>920;
+  if(side){x=r.right+12;y=r.top-14;}        // menu : à droite du « ? »
+  else{x=r.left-6;y=r.bottom+10;}           // titre : sous le « ? »
+  x=Math.max(m,Math.min(x,vw-w-m));y=Math.max(m,Math.min(y,vh-h-m));
+  pop.style.left=x+'px';pop.style.top=y+'px';
+}
+function showHelp(a,pin){
+  clearTimeout(HELP.tHide);
+  const k=a.dataset.help||NAV.current;if(!GUIDE[k])return;
+  const pop=el('help-pop');
+  if(HELP.anchor&&HELP.anchor!==a)HELP.anchor.setAttribute('aria-expanded','false');
+  HELP.key=k;HELP.anchor=a;if(pin!==undefined)HELP.pinned=pin;
+  pop.innerHTML=helpHTML(k);pop.hidden=false;pop.classList.toggle('pinned',HELP.pinned);pop.scrollTop=0;
+  a.setAttribute('aria-expanded','true');placeHelp();
+}
+function hideHelp(force){
+  if(HELP.pinned&&!force)return;
+  clearTimeout(HELP.tShow);clearTimeout(HELP.tHide);
+  el('help-pop').hidden=true;HELP.pinned=false;
+  if(HELP.anchor)HELP.anchor.setAttribute('aria-expanded','false');HELP.anchor=null;HELP.key=null;
+}
+document.querySelectorAll('.help-btn').forEach(a=>{
+  a.addEventListener('mouseenter',()=>{clearTimeout(HELP.tHide);if(HELP.pinned)return;clearTimeout(HELP.tShow);HELP.tShow=setTimeout(()=>showHelp(a),90);});
+  a.addEventListener('mouseleave',()=>{clearTimeout(HELP.tShow);clearTimeout(HELP.tHide);HELP.tHide=setTimeout(()=>hideHelp(),220);});
+  a.addEventListener('focus',()=>{if(!HELP.pinned&&a.matches(':focus-visible'))showHelp(a);});
+  a.addEventListener('blur',()=>{clearTimeout(HELP.tHide);HELP.tHide=setTimeout(()=>hideHelp(),150);});
+  a.addEventListener('click',e=>{e.stopPropagation();clearTimeout(HELP.tShow);
+    if(HELP.pinned&&HELP.anchor===a)hideHelp(true);else showHelp(a,true);});   // clic : épingle (utile sur écran tactile)
+});
+{ const pop=el('help-pop');
+  pop.addEventListener('mouseenter',()=>clearTimeout(HELP.tHide));
+  pop.addEventListener('mouseleave',()=>{clearTimeout(HELP.tHide);HELP.tHide=setTimeout(()=>hideHelp(),220);});
+  pop.addEventListener('click',e=>e.stopPropagation());
+  document.addEventListener('click',()=>hideHelp(true));
+  document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!pop.hidden){const a=HELP.anchor;hideHelp(true);if(a)a.focus();}});
+  window.addEventListener('resize',placeHelp);window.addEventListener('scroll',()=>{const a=HELP.anchor;if(!a)return;const r=a.getBoundingClientRect();
+    if(r.bottom<0||r.top>window.innerHeight)hideHelp(true);else placeHelp();},{passive:true}); }
+
 // Graphiques : typographie et couleurs communes
 if(typeof Chart!=='undefined'){
   Chart.defaults.font.family="'Instrument Sans', system-ui, sans-serif";Chart.defaults.font.size=11;
@@ -3647,7 +4147,7 @@ if(typeof Chart!=='undefined'){
 syncNav();
 
 // Init
-updateCapex();updateBadge();
+syncBattCapex();updateBadge();
 </script>
 </body>
 </html>
